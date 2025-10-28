@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -52,15 +54,27 @@ export async function GET(request: NextRequest) {
     const merchant = merchantData.merchant?.[0];
 
     // Store the tokens and merchant info in Firestore
-    // (This would normally be done via an API route that updates Firestore)
-    // For now, we'll redirect with the data as query params and let the settings page handle it
+    try {
+      await updateDoc(doc(db, 'businesses', state), {
+        paymentProvider: 'square',
+        'paymentConfig.square.connected': true,
+        'paymentConfig.square.accessToken': tokenData.access_token,
+        'paymentConfig.square.refreshToken': tokenData.refresh_token,
+        'paymentConfig.square.merchantId': merchant?.id || '',
+        'paymentConfig.square.sandboxMode': isSandbox,
+        'paymentConfig.square.connectedAt': new Date().toISOString(),
+      });
+      
+      console.log('Square OAuth - Successfully stored connection data for business:', state);
+    } catch (firestoreError) {
+      console.error('Square OAuth - Error storing to Firestore:', firestoreError);
+      return NextResponse.redirect(new URL('/dashboard/settings?square_error=storage_error', request.url));
+    }
     
+    // Redirect back to settings with success message
     const redirectUrl = new URL('/dashboard/settings', request.url);
     redirectUrl.searchParams.set('square_connected', 'true');
-    redirectUrl.searchParams.set('access_token', tokenData.access_token);
-    redirectUrl.searchParams.set('refresh_token', tokenData.refresh_token);
-    redirectUrl.searchParams.set('merchant_id', merchant?.id || '');
-    redirectUrl.searchParams.set('business_id', state);
+    redirectUrl.searchParams.set('merchant_name', merchant?.business_name || 'Square Account');
 
     return NextResponse.redirect(redirectUrl);
   } catch (error: any) {

@@ -109,6 +109,29 @@ function SettingsContent() {
     };
 
     fetchData();
+    
+    // Check for Square connection results in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const squareConnected = urlParams.get('square_connected');
+    const squareError = urlParams.get('square_error');
+    const merchantName = urlParams.get('merchant_name');
+    
+    if (squareConnected === 'true') {
+      showToast(`Square connected successfully${merchantName ? ` (${merchantName})` : ''}!`, 'success');
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (squareError) {
+      const errorMessages: { [key: string]: string } = {
+        'missing_params': 'Missing authorization parameters',
+        'server_error': 'Server error during connection',
+        'storage_error': 'Error saving connection data',
+        'access_denied': 'Square authorization was denied',
+        'invalid_request': 'Invalid Square request',
+      };
+      showToast(`Square connection failed: ${errorMessages[squareError] || squareError}`, 'error');
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   }, [user]);
 
   // Check payment provider connections
@@ -565,11 +588,16 @@ function SettingsContent() {
           paymentProvider: 'square',
           'paymentConfig.square.connected': true,
           'paymentConfig.square.sandboxMode': true,
+          'paymentConfig.square.sandboxAppId': squareAppId,
         });
 
         showToast('Square connected successfully (sandbox mode)', 'success');
-        // Keep loading state while reloading
-        window.location.reload();
+        setConnectingSquare(false);
+        
+        // Refresh the page to show updated connection status
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
         return;
       }
 
