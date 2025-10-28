@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInSmallestUnit,
       currency: currency,
+      payment_method_types: ['card'], // Only allow card payments, disable Google Pay
       metadata: {
         ...metadata,
         businessId,
