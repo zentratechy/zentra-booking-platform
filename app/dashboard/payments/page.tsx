@@ -107,7 +107,9 @@ function PaymentsContent() {
           ? {
               ...apt,
               payment: {
-                ...apt.payment,
+                ...(apt.payment ? Object.fromEntries(
+                  Object.entries(apt.payment).filter(([_, value]) => value !== undefined)
+                ) : {}),
                 status: paymentStatus,
                 method: paymentData.method,
                 amount: totalPaid,
@@ -194,7 +196,9 @@ function PaymentsContent() {
       // Update appointment with refund
       await updateDoc(appointmentRef, {
         payment: {
-          ...selectedPayment.payment,
+          ...(selectedPayment.payment ? Object.fromEntries(
+            Object.entries(selectedPayment.payment).filter(([_, value]) => value !== undefined)
+          ) : {}),
           amount: newPaidAmount,
           status: newPaidAmount === 0 ? 'refunded' : newPaidAmount < totalPrice ? 'partial' : 'paid',
           remainingBalance: totalPrice - newPaidAmount,
@@ -228,7 +232,9 @@ function PaymentsContent() {
           ? {
               ...apt,
               payment: {
-                ...apt.payment,
+                ...(apt.payment ? Object.fromEntries(
+                  Object.entries(apt.payment).filter(([_, value]) => value !== undefined)
+                ) : {}),
                 amount: newPaidAmount,
                 status: newPaidAmount === 0 ? 'refunded' : newPaidAmount < totalPrice ? 'partial' : 'paid',
                 remainingBalance: totalPrice - newPaidAmount,

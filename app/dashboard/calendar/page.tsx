@@ -648,7 +648,9 @@ function CalendarContent() {
         price: isMultiService ? selectedAppointment.price : selectedService?.price,
         status: formData.status,
         payment: {
-          ...selectedAppointment.payment,
+          ...(selectedAppointment.payment ? Object.fromEntries(
+            Object.entries(selectedAppointment.payment).filter(([_, value]) => value !== undefined)
+          ) : {}),
           status: formData.paymentStatus,
           method: formData.paymentMethod,
         },
