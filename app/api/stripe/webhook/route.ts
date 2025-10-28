@@ -66,11 +66,14 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
       businessId,
       appointmentId,
       stripeAccountId,
+      metadata: metadata,
     });
 
     // If there's a connected account, transfer the funds
     if (stripeAccountId) {
       try {
+        console.log('Creating transfer to connected account:', stripeAccountId);
+        
         const transfer = await stripe.transfers.create({
           amount: paymentIntent.amount,
           currency: paymentIntent.currency,
@@ -82,11 +85,23 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
           },
         });
 
-        console.log('Transfer created:', transfer.id);
+        console.log('Transfer created successfully:', {
+          transferId: transfer.id,
+          amount: transfer.amount,
+          destination: transfer.destination,
+        });
       } catch (transferError: any) {
-        console.error('Error creating transfer:', transferError);
+        console.error('Error creating transfer:', {
+          error: transferError.message,
+          code: transferError.code,
+          type: transferError.type,
+          stripeAccountId,
+          amount: paymentIntent.amount,
+        });
         // Don't fail the payment if transfer fails - log it and retry later if needed
       }
+    } else {
+      console.warn('No stripeAccountId found in metadata, payment will stay in platform account');
     }
 
     // Update appointment payment status if appointmentId is provided
