@@ -595,6 +595,10 @@ function SettingsContent() {
 
       const oauthUrl = `${baseUrl}/oauth2/authorize?client_id=${squareAppId}&scope=${scope}&state=${state}&session=false&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
+      console.log('Square OAuth URL:', oauthUrl);
+      console.log('Redirect URI:', redirectUri);
+      console.log('Square App ID:', squareAppId);
+      
       // Keep loading state while redirecting
       window.location.href = oauthUrl;
     } catch (error: any) {
