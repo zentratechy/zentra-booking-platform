@@ -1,0 +1,1071 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import { useAuth } from '@/contexts/AuthContext';
+import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { db, storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import DashboardSidebar from '@/components/DashboardSidebar';
+
+function StaffManagementContent() {
+  const { user } = useAuth();
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedStaff, setSelectedStaff] = useState<any>(null);
+  const [staffMembers, setStaffMembers] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [businessData, setBusinessData] = useState<any>(null);
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    role: '',
+    locationId: '',
+    workingHours: {
+      monday: { open: '09:00', close: '17:00', closed: false },
+      tuesday: { open: '09:00', close: '17:00', closed: false },
+      wednesday: { open: '09:00', close: '17:00', closed: false },
+      thursday: { open: '09:00', close: '17:00', closed: false },
+      friday: { open: '09:00', close: '17:00', closed: false },
+      saturday: { open: '09:00', close: '17:00', closed: false },
+      sunday: { open: '09:00', close: '17:00', closed: true },
+    },
+    breaks: [] as Array<{ day: string; start: string; end: string; label: string }>,
+    services: [] as string[],
+    sendInvite: true,
+    photoURL: '',
+    isBackOfHouse: false,
+  });
+  const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string>('');
+
+  // Fetch staff and business data
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchData = async () => {
+      try {
+        // Fetch business data
+        const businessDoc = await getDoc(doc(db, 'businesses', user.uid));
+        if (businessDoc.exists()) {
+          setBusinessData(businessDoc.data());
+        }
+
+        // Fetch locations
+        const locationsQuery = query(
+          collection(db, 'locations'),
+          where('businessId', '==', user.uid)
+        );
+        const locationsSnapshot = await getDocs(locationsQuery);
+        const locationsData = locationsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setLocations(locationsData);
+
+        // Fetch services
+        const servicesQuery = query(
+          collection(db, 'services'),
+          where('businessId', '==', user.uid)
+        );
+        const servicesSnapshot = await getDocs(servicesQuery);
+        const servicesData = servicesSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setServices(servicesData);
+
+        // Fetch staff members
+        const staffQuery = query(
+          collection(db, 'staff'),
+          where('businessId', '==', user.uid)
+        );
+        const staffSnapshot = await getDocs(staffQuery);
+        const staffData = staffSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        setStaffMembers(staffData);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
+
+  // Helper functions for break management
+  const addBreak = () => {
+    setFormData(prev => ({
+      ...prev,
+      breaks: [...prev.breaks, { day: 'monday', start: '12:00', end: '13:00', label: 'Lunch' }]
+    }));
+  };
+
+  const removeBreak = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      breaks: prev.breaks.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateBreak = (index: number, field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      breaks: prev.breaks.map((break_, i) => 
+        i === index ? { ...break_, [field]: value } : break_
+      )
+    }));
+  };
+
+  const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+  const dayLabels: any = {
+    monday: 'Monday',
+    tuesday: 'Tuesday',
+    wednesday: 'Wednesday',
+    thursday: 'Thursday',
+    friday: 'Friday',
+    saturday: 'Saturday',
+    sunday: 'Sunday',
+  };
+
+  const handleServiceToggle = (serviceId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      services: prev.services.includes(serviceId)
+        ? prev.services.filter(s => s !== serviceId)
+        : [...prev.services, serviceId]
+    }));
+  };
+
+  const handleSelectAllServices = () => {
+    setFormData(prev => ({
+      ...prev,
+      services: services.map(service => service.id)
+    }));
+  };
+
+  const handleClearAllServices = () => {
+    setFormData(prev => ({
+      ...prev,
+      services: []
+    }));
+  };
+
+  const updateWorkingHours = (day: string, field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      workingHours: {
+        ...prev.workingHours,
+        [day]: {
+          ...prev.workingHours[day as keyof typeof prev.workingHours],
+          [field]: value
+        }
+      }
+    }));
+  };
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload an image file');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Image must be less than 2MB');
+      return;
+    }
+
+    setPhotoFile(file);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPhotoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const uploadPhoto = async (staffId: string): Promise<string | null> => {
+    if (!photoFile || !user) return null;
+
+    try {
+      const storageRef = ref(storage, `staff/${user.uid}/${staffId}/${photoFile.name}`);
+      await uploadBytes(storageRef, photoFile);
+      const photoURL = await getDownloadURL(storageRef);
+      return photoURL;
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      return null;
+    }
+  };
+
+  const handleAddStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    setSaving(true);
+    try {
+      const newStaff = {
+        businessId: user.uid,
+        name: `${formData.firstName} ${formData.lastName}`,
+        email: formData.email,
+        phone: formData.phone,
+        role: formData.role,
+        locationId: formData.locationId || (locations.length === 1 ? locations[0].id : null),
+        workingHours: formData.workingHours,
+        breaks: formData.breaks,
+        services: formData.services,
+        status: 'active',
+        joinDate: new Date().toISOString(),
+        appointments: 0,
+        revenue: 0,
+        createdAt: serverTimestamp(),
+        photoURL: '',
+        isBackOfHouse: formData.isBackOfHouse,
+      };
+
+      const docRef = await addDoc(collection(db, 'staff'), newStaff);
+      
+      // Upload photo if selected
+      if (photoFile) {
+        setUploadingPhoto(true);
+        const photoURL = await uploadPhoto(docRef.id);
+        if (photoURL) {
+          await updateDoc(doc(db, 'staff', docRef.id), { photoURL });
+          newStaff.photoURL = photoURL;
+        }
+        setUploadingPhoto(false);
+      }
+      
+      // Add to local state
+      setStaffMembers([...staffMembers, { id: docRef.id, ...newStaff }]);
+      
+      // Reset form and close modal
+      setFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        role: '',
+        locationId: '',
+        workingHours: {
+          monday: { open: '09:00', close: '17:00', closed: false },
+          tuesday: { open: '09:00', close: '17:00', closed: false },
+          wednesday: { open: '09:00', close: '17:00', closed: false },
+          thursday: { open: '09:00', close: '17:00', closed: false },
+          friday: { open: '09:00', close: '17:00', closed: false },
+          saturday: { open: '09:00', close: '17:00', closed: false },
+          sunday: { open: '09:00', close: '17:00', closed: true },
+        },
+        breaks: [],
+        services: [],
+        sendInvite: true,
+        photoURL: '',
+        isBackOfHouse: false,
+      });
+      setPhotoFile(null);
+      setPhotoPreview('');
+      setShowAddModal(false);
+      setSaving(false);
+    } catch (error) {
+      console.error('Error adding staff:', error);
+      alert('Failed to add staff member. Please try again.');
+      setSaving(false);
+    }
+  };
+
+  const handleEditClick = (staff: any) => {
+    setSelectedStaff(staff);
+    const [firstName, lastName] = staff.name.split(' ');
+    setFormData({
+      firstName: firstName || '',
+      lastName: lastName || '',
+      email: staff.email,
+      phone: staff.phone,
+      role: staff.role,
+      locationId: staff.locationId || '',
+      workingHours: staff.workingHours || {
+        monday: { open: '09:00', close: '17:00', closed: false },
+        tuesday: { open: '09:00', close: '17:00', closed: false },
+        wednesday: { open: '09:00', close: '17:00', closed: false },
+        thursday: { open: '09:00', close: '17:00', closed: false },
+        friday: { open: '09:00', close: '17:00', closed: false },
+        saturday: { open: '09:00', close: '17:00', closed: false },
+        sunday: { open: '09:00', close: '17:00', closed: true },
+      },
+      breaks: staff.breaks || [],
+      services: staff.services || [],
+      sendInvite: false,
+      photoURL: staff.photoURL || '',
+      isBackOfHouse: staff.isBackOfHouse || false,
+    });
+    setPhotoPreview(staff.photoURL || '');
+    setPhotoFile(null);
+    setShowEditModal(true);
+  };
+
+  const handleUpdateStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !selectedStaff) return;
+
+    setSaving(true);
+    try {
+      const updatedData: any = {
+        name: `${formData.firstName} ${formData.lastName}`,
+        email: formData.email,
+        phone: formData.phone,
+        role: formData.role,
+        locationId: formData.locationId || (locations.length === 1 ? locations[0].id : null),
+        workingHours: formData.workingHours,
+        breaks: formData.breaks,
+        services: formData.services,
+        updatedAt: serverTimestamp(),
+        isBackOfHouse: formData.isBackOfHouse,
+      };
+
+      // Upload photo if selected
+      if (photoFile) {
+        setUploadingPhoto(true);
+        const photoURL = await uploadPhoto(selectedStaff.id);
+        if (photoURL) {
+          updatedData.photoURL = photoURL;
+        }
+        setUploadingPhoto(false);
+      }
+
+      await updateDoc(doc(db, 'staff', selectedStaff.id), updatedData);
+      
+      // Update local state
+      setStaffMembers(staffMembers.map(s => 
+        s.id === selectedStaff.id ? { ...s, ...updatedData } : s
+      ));
+      
+      // Reset and close
+      setFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        role: '',
+        locationId: '',
+        workingHours: {
+          monday: { open: '09:00', close: '17:00', closed: false },
+          tuesday: { open: '09:00', close: '17:00', closed: false },
+          wednesday: { open: '09:00', close: '17:00', closed: false },
+          thursday: { open: '09:00', close: '17:00', closed: false },
+          friday: { open: '09:00', close: '17:00', closed: false },
+          saturday: { open: '09:00', close: '17:00', closed: false },
+          sunday: { open: '09:00', close: '17:00', closed: true },
+        },
+        breaks: [],
+        services: [],
+        sendInvite: true,
+        photoURL: '',
+        isBackOfHouse: false,
+      });
+      setPhotoFile(null);
+      setPhotoPreview('');
+      setSelectedStaff(null);
+      setShowEditModal(false);
+      setSaving(false);
+    } catch (error) {
+      console.error('Error updating staff:', error);
+      alert('Failed to update staff member. Please try again.');
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteClick = (staff: any) => {
+    setSelectedStaff(staff);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteStaff = async () => {
+    if (!selectedStaff) return;
+
+    setSaving(true);
+    try {
+      await deleteDoc(doc(db, 'staff', selectedStaff.id));
+      
+      // Remove from local state
+      setStaffMembers(staffMembers.filter(s => s.id !== selectedStaff.id));
+      
+      setSelectedStaff(null);
+      setShowDeleteModal(false);
+      setSaving(false);
+    } catch (error) {
+      console.error('Error deleting staff:', error);
+      alert('Failed to delete staff member. Please try again.');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-soft-cream">
+      <DashboardSidebar />
+
+      {/* Main Content */}
+      <div className="ml-64 min-h-screen">
+        {/* Top Bar */}
+        <div className="bg-white shadow-sm sticky top-0 z-30">
+          <div className="px-8 py-4 flex justify-between items-center">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Staff Management</h2>
+              <p className="text-gray-600">Manage your team members and their schedules</p>
+            </div>
+            <button 
+              onClick={() => setShowAddModal(true)}
+              className="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+            >
+              + Add Staff Member
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-8">
+          {/* Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+              <div className="text-sm text-gray-600 mb-2">Total Staff</div>
+              <div className="text-3xl font-bold text-gray-900">{staffMembers.length}</div>
+            </div>
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+              <div className="text-sm text-gray-600 mb-2">Active Today</div>
+              <div className="text-3xl font-bold text-gray-900">{staffMembers.filter(s => s.status === 'active').length}</div>
+            </div>
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+              <div className="text-sm text-gray-600 mb-2">Total Appointments</div>
+              <div className="text-3xl font-bold text-gray-900">{staffMembers.reduce((sum, s) => sum + (s.appointments || 0), 0)}</div>
+            </div>
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+              <div className="text-sm text-gray-600 mb-2">Total Revenue</div>
+              <div className="text-3xl font-bold text-gray-900">${staffMembers.reduce((sum, s) => sum + (s.revenue || 0), 0).toLocaleString()}</div>
+            </div>
+          </div>
+
+          {/* Staff List */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+            {loading ? (
+              <div className="p-12 text-center">
+                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading staff...</p>
+              </div>
+            ) : staffMembers.length === 0 ? (
+              <div className="p-12 text-center">
+                <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No staff members yet</h3>
+                <p className="text-gray-600 mb-4">Add your first staff member to get started</p>
+                <button 
+                  onClick={() => setShowAddModal(true)}
+                  className="px-6 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg font-medium transition-colors"
+                >
+                  Add Staff Member
+                </button>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {staffMembers.map((staff) => (
+                <div key={staff.id} className="p-6 hover:bg-soft-pink/20 transition-colors">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-4">
+                      {staff.photoURL ? (
+                        <img 
+                          src={staff.photoURL} 
+                          alt={staff.name}
+                          className="w-16 h-16 object-cover rounded-full border-2 border-gray-200"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 bg-gradient-to-br from-primary/20 to-secondary/40 rounded-full flex items-center justify-center text-2xl font-bold text-primary">
+                          {staff.name.split(' ').map((n: string) => n[0]).join('')}
+                        </div>
+                      )}
+                      <div>
+                        <div className="flex items-center space-x-2 mb-1">
+                          <h3 className="text-lg font-semibold text-gray-900">{staff.name}</h3>
+                          <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
+                            {staff.status}
+                          </span>
+                          {staff.isBackOfHouse && (
+                            <span className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full">
+                              Back of House
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600 mb-2">{staff.role}</p>
+                        <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
+                          <span>{staff.email}</span>
+                          <span>•</span>
+                          <span>{staff.phone}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {staff.isBackOfHouse ? (
+                            <span className="text-xs text-gray-500 italic">Non-service staff</span>
+                          ) : staff.services && staff.services.length > 0 ? (
+                            staff.services.map((service: string, idx: number) => (
+                              <span key={idx} className="px-2 py-1 text-xs bg-primary/10 text-primary rounded-full">
+                                {service}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-xs text-gray-500 italic">No services assigned</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="grid grid-cols-3 gap-6 mb-4">
+                        <div>
+                          <div className="text-sm text-gray-600">Joined</div>
+                          <div className="font-semibold text-gray-900">
+                            {staff.joinDate ? new Date(staff.joinDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'N/A'}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600">Appointments</div>
+                          <div className="font-semibold text-gray-900">{staff.appointments || 0}</div>
+                        </div>
+                        <div>
+                          <div className="text-sm text-gray-600">Revenue</div>
+                          <div className="font-semibold text-gray-900">${staff.revenue || 0}</div>
+                        </div>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button 
+                          onClick={() => handleEditClick(staff)}
+                          className="px-4 py-2 text-sm text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteClick(staff)}
+                          className="px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Add Staff Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-100">
+              <div className="flex justify-between items-center">
+                <h3 className="text-2xl font-bold text-gray-900">Add Staff Member</h3>
+                <button 
+                  onClick={() => setShowAddModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleAddStaff} className="p-6 space-y-4">
+              {/* Photo Upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Staff Photo</label>
+                <div className="flex items-center space-x-4">
+                  {photoPreview ? (
+                    <div className="relative">
+                      <img 
+                        src={photoPreview} 
+                        alt="Staff Preview" 
+                        className="w-24 h-24 object-cover rounded-full border-2 border-gray-200"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPhotoFile(null);
+                          setPhotoPreview('');
+                        }}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center"
+                        title="Remove photo"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-24 h-24 bg-gray-100 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center">
+                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoChange}
+                      className="hidden"
+                      id="staff-photo-add"
+                    />
+                    <label
+                      htmlFor="staff-photo-add"
+                      className="inline-block px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors cursor-pointer"
+                    >
+                      {photoPreview ? 'Change Photo' : 'Upload Photo'}
+                    </label>
+                    <p className="text-xs text-gray-600 mt-2">
+                      Recommended: Square image, max 2MB
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
+                  <input 
+                    type="text"
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                    placeholder="Enter first name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Last Name *</label>
+                  <input 
+                    type="text"
+                    value={formData.lastName}
+                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                    placeholder="Enter last name"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email Address *</label>
+                <input 
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                  placeholder="email@example.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number *</label>
+                <input 
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                  placeholder="(123) 456-7890"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Role/Title *</label>
+                <input 
+                  type="text"
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                  placeholder="e.g., Senior Stylist, Receptionist, Manager"
+                />
+              </div>
+
+              {/* Back of House Option */}
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.isBackOfHouse}
+                    onChange={(e) => setFormData({ ...formData, isBackOfHouse: e.target.checked, services: e.target.checked ? [] : formData.services })}
+                    className="mt-1 w-5 h-5 text-primary border-gray-300 rounded focus:ring-primary"
+                  />
+                  <div>
+                    <span className="font-medium text-gray-900">Back of House Staff</span>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Check this for non-service staff (receptionist, manager, cleaner, etc.). They won't appear on the booking page.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {!formData.isBackOfHouse && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">Services * (select at least one)</label>
+                  <div className="flex space-x-2 mb-3">
+                    <button
+                      type="button"
+                      onClick={handleSelectAllServices}
+                      className="px-3 py-1 text-sm bg-primary/10 text-primary rounded-lg hover:bg-primary/20"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleClearAllServices}
+                      className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                    {services.map((service: any) => (
+                      <button
+                        key={service.id}
+                        type="button"
+                        onClick={() => handleServiceToggle(service.id)}
+                        className={`p-3 rounded-lg border-2 text-sm text-left transition-all ${
+                          formData.services.includes(service.id)
+                            ? 'border-primary bg-primary/10 text-primary font-medium'
+                            : 'border-gray-200 hover:border-primary/50'
+                        }`}
+                      >
+                        <div>
+                          <div className="font-medium">{service.name}</div>
+                          <div className="text-xs text-gray-500">{service.price ? `$${service.price}` : ''}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center">
+                <input 
+                  type="checkbox"
+                  checked={formData.sendInvite}
+                  onChange={(e) => setFormData({ ...formData, sendInvite: e.target.checked })}
+                  className="rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <span className="ml-2 text-sm text-gray-700">Send invitation email to staff member</span>
+              </div>
+
+              <div className="pt-4 border-t border-gray-100 flex justify-end space-x-3">
+                <button 
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  disabled={saving}
+                  className="px-6 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-semibold transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={saving || (!formData.isBackOfHouse && formData.services.length === 0)}
+                  className="px-6 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? 'Adding...' : 'Add Staff Member'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Staff Modal */}
+      {showEditModal && selectedStaff && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-100">
+              <div className="flex justify-between items-center">
+                <h3 className="text-2xl font-bold text-gray-900">Edit Staff Member</h3>
+                <button 
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setSelectedStaff(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleUpdateStaff} className="p-6 space-y-4">
+              {/* Photo Upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Staff Photo</label>
+                <div className="flex items-center space-x-4">
+                  {photoPreview ? (
+                    <div className="relative">
+                      <img 
+                        src={photoPreview} 
+                        alt="Staff Preview" 
+                        className="w-24 h-24 object-cover rounded-full border-2 border-gray-200"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPhotoFile(null);
+                          setPhotoPreview(selectedStaff.photoURL || '');
+                        }}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center"
+                        title="Remove photo"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-24 h-24 bg-gray-100 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center">
+                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoChange}
+                      className="hidden"
+                      id="staff-photo-edit"
+                    />
+                    <label
+                      htmlFor="staff-photo-edit"
+                      className="inline-block px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors cursor-pointer"
+                    >
+                      {photoPreview ? 'Change Photo' : 'Upload Photo'}
+                    </label>
+                    <p className="text-xs text-gray-600 mt-2">
+                      Recommended: Square image, max 2MB
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
+                  <input 
+                    type="text"
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                    placeholder="Enter first name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Last Name *</label>
+                  <input 
+                    type="text"
+                    value={formData.lastName}
+                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                    placeholder="Enter last name"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email Address *</label>
+                <input 
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                  placeholder="email@example.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number *</label>
+                <input 
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                  placeholder="(123) 456-7890"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Role/Title *</label>
+                <input 
+                  type="text"
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                  placeholder="e.g., Senior Stylist, Receptionist, Manager"
+                />
+              </div>
+
+              {/* Back of House Option */}
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.isBackOfHouse}
+                    onChange={(e) => setFormData({ ...formData, isBackOfHouse: e.target.checked, services: e.target.checked ? [] : formData.services })}
+                    className="mt-1 w-5 h-5 text-primary border-gray-300 rounded focus:ring-primary"
+                  />
+                  <div>
+                    <span className="font-medium text-gray-900">Back of House Staff</span>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Check this for non-service staff (receptionist, manager, cleaner, etc.). They won't appear on the booking page.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {!formData.isBackOfHouse && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">Services * (select at least one)</label>
+                  <div className="flex space-x-2 mb-3">
+                    <button
+                      type="button"
+                      onClick={handleSelectAllServices}
+                      className="px-3 py-1 text-sm bg-primary/10 text-primary rounded-lg hover:bg-primary/20"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleClearAllServices}
+                      className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                    {services.map((service: any) => (
+                      <button
+                        key={service.id}
+                        type="button"
+                        onClick={() => handleServiceToggle(service.id)}
+                        className={`p-3 rounded-lg border-2 text-sm text-left transition-all ${
+                          formData.services.includes(service.id)
+                            ? 'border-primary bg-primary/10 text-primary font-medium'
+                            : 'border-gray-200 hover:border-primary/50'
+                        }`}
+                      >
+                        <div>
+                          <div className="font-medium">{service.name}</div>
+                          <div className="text-xs text-gray-500">{service.price ? `$${service.price}` : ''}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-4 border-t border-gray-100 flex justify-end space-x-3">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setSelectedStaff(null);
+                  }}
+                  disabled={saving}
+                  className="px-6 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-semibold transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  disabled={saving || (!formData.isBackOfHouse && formData.services.length === 0)}
+                  className="px-6 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? 'Updating...' : 'Update Staff Member'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && selectedStaff && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-100 mx-auto mb-4">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              
+              <h3 className="text-xl font-bold text-gray-900 text-center mb-2">Delete Staff Member</h3>
+              <p className="text-gray-600 text-center mb-6">
+                Are you sure you want to delete <span className="font-semibold">{selectedStaff.name}</span>? This action cannot be undone.
+              </p>
+
+              <div className="flex space-x-3">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setSelectedStaff(null);
+                  }}
+                  disabled={saving}
+                  className="flex-1 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-semibold transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button"
+                  onClick={handleDeleteStaff}
+                  disabled={saving}
+                  className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-50"
+                >
+                  {saving ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function StaffManagement() {
+  return (
+    <ProtectedRoute>
+      <StaffManagementContent />
+    </ProtectedRoute>
+  );
+}
+
