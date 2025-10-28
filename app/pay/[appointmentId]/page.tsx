@@ -190,8 +190,8 @@ export default function PaymentPage() {
         'payment.amount': totalPaid,
         'payment.remainingBalance': 0,
         'payment.paidViaLink': true,
-        'payment.voucherCode': appliedVoucher?.code,
-        'payment.voucherDiscount': voucherDiscount,
+        ...(appliedVoucher?.code && { 'payment.voucherCode': appliedVoucher.code }),
+        ...(voucherDiscount > 0 && { 'payment.voucherDiscount': voucherDiscount }),
         updatedAt: serverTimestamp(),
       });
 
