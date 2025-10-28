@@ -583,25 +583,8 @@ function SettingsContent() {
       const squareAppId = process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID;
       const isSandbox = squareAppId?.startsWith('sandbox-');
 
-      if (isSandbox) {
-        await updateDoc(doc(db, 'businesses', user!.uid), {
-          paymentProvider: 'square',
-          'paymentConfig.square.connected': true,
-          'paymentConfig.square.sandboxMode': true,
-          'paymentConfig.square.sandboxAppId': squareAppId,
-        });
-
-        showToast('Square connected successfully (sandbox mode)', 'success');
-        setConnectingSquare(false);
-        
-        // Refresh the page to show updated connection status
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
-        return;
-      }
-
-      // Production OAuth flow
+      // Always use OAuth flow (both sandbox and production)
+      // Sandbox OAuth will connect to Square's sandbox environment
       const redirectUri = `${window.location.origin}/api/square/oauth`;
       const state = user!.uid;
       const scope = encodeURIComponent('MERCHANT_PROFILE_READ PAYMENTS_WRITE PAYMENTS_READ');

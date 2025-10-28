@@ -20,8 +20,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Square not connected' }, { status: 400 });
     }
 
+    // Determine Square API base URL based on environment
+    const isSandbox = businessData.paymentConfig?.square?.sandboxMode;
+    const baseUrl = isSandbox ? 'https://connect.squareupsandbox.com' : 'https://connect.squareup.com';
+    
     // Create payment using Square API
-    const response = await fetch('https://connect.squareup.com/v2/payments', {
+    const response = await fetch(`${baseUrl}/v2/payments`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${squareAccessToken}`,
