@@ -1009,7 +1009,7 @@ function PaymentsContent() {
                               type: 'payment_link',
                               businessId: user?.uid,
                               paymentData: {
-                                clientName: selectedPayment.clientName,
+                                customerName: selectedPayment.clientName,
                                 serviceName: selectedPayment.serviceName,
                                 amount: amountToPay,
                                 currency: currency,
