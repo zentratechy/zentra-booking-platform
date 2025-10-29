@@ -11,6 +11,48 @@ import { db } from '@/lib/firebase';
 import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 import Toast from '@/components/Toast';
 
+// Helper function to safely format dates from Firestore
+function formatAppointmentDate(dateValue: any): string {
+  try {
+    let date: Date;
+    
+    if (dateValue?.toDate && typeof dateValue.toDate === 'function') {
+      // Firestore Timestamp
+      date = dateValue.toDate();
+    } else if (dateValue instanceof Date) {
+      // Already a Date object
+      date = dateValue;
+    } else if (typeof dateValue === 'string') {
+      // ISO string or date string
+      date = new Date(dateValue);
+    } else if (typeof dateValue === 'number') {
+      // Unix timestamp
+      date = new Date(dateValue);
+    } else if (dateValue?.seconds) {
+      // Firestore Timestamp format (seconds + nanoseconds)
+      date = new Date(dateValue.seconds * 1000);
+    } else {
+      console.warn('Invalid date format:', dateValue);
+      return 'Invalid Date';
+    }
+
+    // Validate the date
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date value');
+      return 'Invalid Date';
+    }
+
+    return date.toLocaleDateString('en-GB', { 
+      day: 'numeric', 
+      month: 'short', 
+      year: 'numeric' 
+    });
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'Invalid Date';
+  }
+}
+
 function PaymentsContent() {
   const { user } = useAuth();
   const router = useRouter();
@@ -410,7 +452,9 @@ function PaymentsContent() {
             ) : (
               <div className="divide-y divide-gray-100">
                 {filteredAppointments.map((apt) => {
-                  const aptDate = apt.date?.toDate ? apt.date.toDate() : new Date(apt.date);
+                  // Format date using helper function
+                  const formattedDate = formatAppointmentDate(apt.date);
+
                   return (
                     <div key={apt.id} className="p-6 hover:bg-soft-pink/20 transition-colors">
                       <div className="flex items-center justify-between">
@@ -445,9 +489,9 @@ function PaymentsContent() {
                           <div className="flex items-center space-x-4 text-sm text-gray-600">
                             <span>{apt.serviceName}</span>
                             <span>•</span>
-                            <span>{aptDate.toLocaleDateString()}</span>
+                            <span>{formattedDate}</span>
                             <span>•</span>
-                            <span>{apt.time}</span>
+                            <span>{apt.time || 'N/A'}</span>
                           </div>
                           {apt.payment?.method && (
                             <div className="text-sm text-gray-600 mt-1">
@@ -591,9 +635,7 @@ function PaymentsContent() {
                     <div>
                       <span className="text-gray-600">Date:</span>
                       <p className="font-medium text-gray-900">
-                        {selectedPayment.date?.toDate ? 
-                          selectedPayment.date.toDate().toLocaleDateString() : 
-                          new Date(selectedPayment.date).toLocaleDateString()}
+                        {formatAppointmentDate(selectedPayment.date)}
                       </p>
                     </div>
                     <div>
@@ -686,18 +728,72 @@ function PaymentsContent() {
                     <div className="flex justify-between">
                       <span className="text-gray-600">Created:</span>
                       <span className="font-medium text-gray-900">
-                        {selectedPayment.createdAt?.toDate ? 
-                          selectedPayment.createdAt.toDate().toLocaleString() : 
-                          'N/A'}
+                        {(() => {
+                          try {
+                            let createDate: Date;
+                            if (selectedPayment.createdAt?.toDate && typeof selectedPayment.createdAt.toDate === 'function') {
+                              createDate = selectedPayment.createdAt.toDate();
+                            } else if (selectedPayment.createdAt instanceof Date) {
+                              createDate = selectedPayment.createdAt;
+                            } else if (typeof selectedPayment.createdAt === 'string') {
+                              createDate = new Date(selectedPayment.createdAt);
+                            } else if (selectedPayment.createdAt?.seconds) {
+                              createDate = new Date(selectedPayment.createdAt.seconds * 1000);
+                            } else {
+                              return 'N/A';
+                            }
+                            
+                            if (isNaN(createDate.getTime())) {
+                              return 'N/A';
+                            }
+                            
+                            return createDate.toLocaleString('en-GB', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            });
+                          } catch (error) {
+                            return 'N/A';
+                          }
+                        })()}
                       </span>
                     </div>
                     {selectedPayment.updatedAt && (
                       <div className="flex justify-between">
                         <span className="text-gray-600">Last Updated:</span>
                         <span className="font-medium text-gray-900">
-                          {selectedPayment.updatedAt?.toDate ? 
-                            selectedPayment.updatedAt.toDate().toLocaleString() : 
-                            'N/A'}
+                          {(() => {
+                            try {
+                              let updateDate: Date;
+                              if (selectedPayment.updatedAt?.toDate && typeof selectedPayment.updatedAt.toDate === 'function') {
+                                updateDate = selectedPayment.updatedAt.toDate();
+                              } else if (selectedPayment.updatedAt instanceof Date) {
+                                updateDate = selectedPayment.updatedAt;
+                              } else if (typeof selectedPayment.updatedAt === 'string') {
+                                updateDate = new Date(selectedPayment.updatedAt);
+                              } else if (selectedPayment.updatedAt?.seconds) {
+                                updateDate = new Date(selectedPayment.updatedAt.seconds * 1000);
+                              } else {
+                                return 'N/A';
+                              }
+                              
+                              if (isNaN(updateDate.getTime())) {
+                                return 'N/A';
+                              }
+                              
+                              return updateDate.toLocaleString('en-GB', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              });
+                            } catch (error) {
+                              return 'N/A';
+                            }
+                          })()}
                         </span>
                       </div>
                     )}
