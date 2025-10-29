@@ -612,6 +612,26 @@ function SettingsContent() {
   const handleConnectStripe = async () => {
     setConnectingStripe(true);
     try {
+      // First, try OAuth if configured (connects existing accounts directly)
+      const stripeClientId = process.env.NEXT_PUBLIC_STRIPE_CLIENT_ID;
+      
+      if (stripeClientId) {
+        // Use OAuth to connect existing Stripe account directly
+        let domain = window.location.hostname;
+        if (domain.startsWith('www.')) {
+          domain = domain.substring(4);
+        }
+        const redirectUri = `https://${domain}/api/stripe/oauth`;
+        const state = user!.uid;
+
+        const oauthUrl = `https://connect.stripe.com/oauth/authorize?response_type=code&client_id=${encodeURIComponent(stripeClientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read_write&state=${encodeURIComponent(state)}`;
+        
+        // Redirect to Stripe OAuth
+        window.location.href = oauthUrl;
+        return;
+      }
+
+      // Fall back to Connect account creation (creates new account)
       // Validate required data
       if (!user?.email) {
         showToast('User email is required', 'error');
