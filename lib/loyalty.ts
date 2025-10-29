@@ -97,4 +97,70 @@ export function getTierDiscount(tier: 'Bronze' | 'Silver' | 'Gold'): number {
   }
 }
 
+/**
+ * Award referral bonus points to referrer and referee
+ * @param businessId - The business ID
+ * @param referrerId - The client ID who made the referral
+ * @param refereeId - The client ID who was referred (the new customer)
+ * @returns Promise<boolean> - Success status
+ */
+export async function awardReferralPoints(
+  businessId: string,
+  referrerId: string,
+  refereeId: string
+): Promise<boolean> {
+  try {
+    // Get business loyalty settings
+    const businessDoc = await getDoc(doc(db, 'businesses', businessId));
+    if (!businessDoc.exists()) {
+      console.error('Business not found');
+      return false;
+    }
+
+    const businessData = businessDoc.data();
+    const loyaltyProgram = businessData.loyaltyProgram;
+
+    // Check if loyalty program is active
+    if (!loyaltyProgram?.active) {
+      console.log('Loyalty program is not active, skipping referral bonus');
+      return false;
+    }
+
+    // Get referral bonus points (default to 100)
+    const referralBonus = loyaltyProgram.settings?.referralBonus || 100;
+
+    if (referralBonus <= 0) {
+      console.log('Referral bonus is set to 0, skipping');
+      return false;
+    }
+
+    // Award points to referrer (the person who shared the link)
+    try {
+      await updateDoc(doc(db, 'clients', referrerId), {
+        loyaltyPoints: increment(referralBonus),
+      });
+      console.log(`✅ Awarded ${referralBonus} referral bonus points to referrer ${referrerId}`);
+    } catch (error) {
+      console.error('Error awarding points to referrer:', error);
+      // Continue to award to referee even if referrer fails
+    }
+
+    // Award points to referee (the new customer who was referred)
+    try {
+      await updateDoc(doc(db, 'clients', refereeId), {
+        loyaltyPoints: increment(referralBonus),
+      });
+      console.log(`✅ Awarded ${referralBonus} referral bonus points to referee ${refereeId}`);
+    } catch (error) {
+      console.error('Error awarding points to referee:', error);
+      // Don't fail the whole operation if referee fails
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error awarding referral points:', error);
+    return false;
+  }
+}
+
 

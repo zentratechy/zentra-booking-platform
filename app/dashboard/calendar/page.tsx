@@ -8,7 +8,7 @@ import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, s
 import { db } from '@/lib/firebase';
 import CalendarComponent from '@/components/Calendar';
 import { formatPrice, getCurrencySymbol } from '@/lib/currency';
-import { awardLoyaltyPoints } from '@/lib/loyalty';
+import { awardLoyaltyPoints, awardReferralPoints } from '@/lib/loyalty';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import DragDropCalendar from '@/components/DragDropCalendar';
 import { useToast } from '@/hooks/useToast';
@@ -427,6 +427,7 @@ function CalendarContent() {
             businessId: user.uid,
             appointmentData: {
               customerName: clientData.name,
+              clientId: clientId, // Include clientId for referral link generation
               clientEmail: clientData.email,
               serviceName: selectedService.name,
               staffName: selectedStaff?.name || 'Any Staff',
@@ -700,6 +701,35 @@ function CalendarContent() {
                 ? { ...c, loyaltyPoints: (c.loyaltyPoints || 0) + pointsToAward } 
                 : c
             ));
+          }
+
+          // Award referral bonus points if this was a referral
+          const referralClientId = (selectedAppointment as any)?.referredBy;
+          if (referralClientId && formData.clientId) {
+            // Only award referral points if this is their first completed appointment
+            // Check BEFORE updating to completed status, so we only count previous completions
+            try {
+              const clientAppointmentsQuery = query(
+                collection(db, 'appointments'),
+                where('businessId', '==', user.uid),
+                where('clientId', '==', formData.clientId),
+                where('status', '==', 'completed')
+              );
+              const existingCompletedAppointments = await getDocs(clientAppointmentsQuery);
+              
+              // If this will be the first completed appointment (no previous completions), award referral points
+              if (existingCompletedAppointments.size === 0) {
+                await awardReferralPoints(
+                  user.uid,
+                  referralClientId,
+                  formData.clientId
+                );
+                showToast('Referral bonus points awarded!', 'success');
+              }
+            } catch (referralError) {
+              console.error('Error awarding referral points:', referralError);
+              // Don't fail the appointment update if referral fails
+            }
           }
         }
 

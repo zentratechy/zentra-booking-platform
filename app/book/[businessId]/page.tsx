@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { collection, query, where, getDocs, addDoc, doc, getDoc, serverTimestamp, Timestamp, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -88,8 +88,12 @@ function CheckoutForm({ amount, onSuccess, isDeposit, appointmentData, colorSche
 
 export default function BookingPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const businessId = params.businessId as string;
   const { showToast, ToastContainer } = useToast();
+  
+  // Get referral ID from URL parameter (if someone clicked a referral link)
+  const referralClientId = searchParams?.get('ref') || null;
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -928,7 +932,7 @@ export default function BookingPage() {
         const firstName = nameParts[0] || '';
         const lastName = nameParts.slice(1).join(' ') || '';
         
-        const newClientData = {
+        const newClientData: any = {
           businessId,
           name: clientInfo.name,
           firstName: firstName,
@@ -942,6 +946,24 @@ export default function BookingPage() {
           lastVisit: serverTimestamp(),
           source: 'online_booking',
         };
+        
+        // If this is a referral (first-time customer via referral link), store the referral
+        if (referralClientId) {
+          // Verify the referrer exists and belongs to this business
+          try {
+            const referrerDoc = await getDoc(doc(db, 'clients', referralClientId));
+            if (referrerDoc.exists()) {
+              const referrerData = referrerDoc.data();
+              if (referrerData.businessId === businessId) {
+                newClientData.referredBy = referralClientId;
+                newClientData.referredAt = serverTimestamp();
+              }
+            }
+          } catch (error) {
+            console.error('Error validating referrer:', error);
+            // Continue without referral if validation fails
+          }
+        }
         
         const clientDocRef = await addDoc(collection(db, 'clients'), newClientData);
         clientId = clientDocRef.id;
@@ -982,7 +1004,7 @@ export default function BookingPage() {
       
       
       // Create appointment in Firestore with client ID
-      const appointmentData = {
+      const appointmentData: any = {
         businessId,
         clientId, // Link to client record
         clientName: clientInfo.name,
@@ -1052,6 +1074,8 @@ export default function BookingPage() {
         notes: clientInfo.notes,
         createdAt: serverTimestamp(),
         source: 'online_booking',
+        // Store referral info if this booking came from a referral link
+        ...(referralClientId && clientId ? { referredBy: referralClientId } : {}),
       };
 
 
@@ -1121,6 +1145,7 @@ export default function BookingPage() {
             businessId: businessId,
             appointmentData: {
               customerName: clientInfo.name,
+              clientId: clientId, // Include clientId for referral link generation
               clientEmail: clientInfo.email,
               businessId: businessId,
               businessName: business?.businessName || '',

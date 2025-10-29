@@ -13,6 +13,7 @@ export interface BusinessEmailSettings {
 
 export interface AppointmentData {
   customerName: string;
+  clientId?: string; // Client ID for referral links
   serviceName: string;
   staffName: string;
   appointmentDate: string;
@@ -354,7 +355,7 @@ export function generateEmailTemplate(
               Love our service? Refer a friend and you'll both earn bonus loyalty points when they book their first appointment!
             </p>
             <div style="text-align: center;">
-              <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/book/${appointmentData?.businessId || 'YOUR_BUSINESS_ID'}?ref=${appointmentData?.customerName || 'customer'}" 
+              <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/book/${appointmentData?.businessId || 'YOUR_BUSINESS_ID'}?ref=${appointmentData?.clientId || ''}" 
                  style="display: inline-block; background: rgba(255,255,255,0.2); color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; border: 1px solid rgba(255,255,255,0.3); transition: all 0.3s ease;">
                 📱 Share Booking Link
               </a>
