@@ -121,14 +121,35 @@ function SettingsContent() {
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (squareError) {
+      // Decode the error message (it might be URL encoded)
+      const decodedError = decodeURIComponent(squareError);
+      
       const errorMessages: { [key: string]: string } = {
-        'missing_params': 'Missing authorization parameters',
-        'server_error': 'Server error during connection',
-        'storage_error': 'Error saving connection data',
-        'access_denied': 'Square authorization was denied',
-        'invalid_request': 'Invalid Square request',
+        'missing_params': 'Missing authorization parameters. Please try connecting again.',
+        'server_error': 'Server error during connection. Please try again in a moment.',
+        'storage_error': 'Error saving connection data. Please contact support.',
+        'access_denied': 'Square authorization was denied. Please try again.',
+        'invalid_request': 'Invalid Square request. Please verify your Square app configuration.',
+        'app_id_missing': 'Square application ID not configured. Please contact support.',
+        'app_secret_missing': 'Square application secret not configured. Please contact support.',
+        'no_access_token': 'Failed to receive access token from Square. The authorization code may have expired. Please try again.',
+        'token_exchange_failed': 'Failed to exchange authorization code. Please try connecting again.',
+        'invalid_authorization_code': 'The authorization code is invalid or has expired. Please try connecting again from the beginning.',
+        '400': 'Square returned a 400 error. This usually means the authorization code was invalid or expired. Please try connecting again.',
+        'HTTP 400': 'Square API returned 400 Bad Request. The authorization code may be invalid or expired. Please try again.',
       };
-      showToast(`Square connection failed: ${errorMessages[squareError] || squareError}`, 'error');
+      
+      // Check if it's a known error or show the decoded error
+      const errorMessage = errorMessages[decodedError] || errorMessages[squareError] || decodedError || squareError;
+      showToast(`Square connection failed: ${errorMessage}`, 'error');
+      
+      // Log for debugging
+      console.error('Square connection error:', {
+        rawError: squareError,
+        decodedError: decodedError,
+        message: errorMessage
+      });
+      
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }

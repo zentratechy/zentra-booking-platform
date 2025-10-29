@@ -71,7 +71,25 @@ export async function GET(request: NextRequest) {
     // Check for HTTP errors first
     if (!tokenResponse.ok) {
       console.error('Square OAuth - HTTP Error:', tokenResponse.status, tokenResponse.statusText);
-      const errorMessage = tokenData.error_description || tokenData.error || `HTTP ${tokenResponse.status}`;
+      console.error('Square OAuth - Error response:', JSON.stringify(tokenData, null, 2));
+      
+      // Common 400 errors from Square
+      let errorMessage = `HTTP ${tokenResponse.status}`;
+      if (tokenResponse.status === 400) {
+        if (tokenData.errors && tokenData.errors.length > 0) {
+          const error = tokenData.errors[0];
+          errorMessage = error.detail || error.code || 'invalid_authorization_code';
+        } else if (tokenData.error_description) {
+          errorMessage = tokenData.error_description;
+        } else if (tokenData.error) {
+          errorMessage = tokenData.error;
+        } else {
+          errorMessage = 'invalid_authorization_code';
+        }
+      } else {
+        errorMessage = tokenData.error_description || tokenData.error || `HTTP ${tokenResponse.status}`;
+      }
+      
       return NextResponse.redirect(new URL(`${origin}/dashboard/settings?square_error=${encodeURIComponent(errorMessage)}`, request.url));
     }
 
