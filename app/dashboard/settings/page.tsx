@@ -123,11 +123,28 @@ function SettingsContent() {
       showToast(`Stripe connected successfully${accountId ? ` (${accountId.slice(0, 8)}...)` : ''}!`, 'success');
       // Clean up URL and refresh to update connection status
       window.history.replaceState({}, document.title, window.location.pathname);
-      // Refresh business data to show updated connection
+      // Refresh business data and re-check account status
       (async () => {
         const businessDoc = await getDoc(doc(db, 'businesses', user!.uid));
         if (businessDoc.exists()) {
-          setBusinessData(businessDoc.data());
+          const updatedData = businessDoc.data();
+          setBusinessData({ id: businessDoc.id, ...updatedData });
+          
+          // Re-check Stripe connection status after refresh
+          if (updatedData.paymentConfig?.stripe?.accountId) {
+            try {
+              const stripeResponse = await fetch('/api/stripe/account-status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accountId: updatedData.paymentConfig.stripe.accountId })
+              });
+              const stripeData = await stripeResponse.json();
+              setStripeAccountStatus(stripeData);
+              setStripeConnected(stripeData.connected || false);
+            } catch (error) {
+              console.error('Error checking Stripe connection:', error);
+            }
+          }
         }
       })();
     } else if (stripeError) {
