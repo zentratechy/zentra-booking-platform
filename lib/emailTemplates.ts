@@ -110,7 +110,7 @@ export function generateEmailTemplate(
   
   // Extract clientId and businessId from any data structure
   const clientId = appointmentData?.clientId || (appointmentData as any)?.clientId;
-  const businessId = appointmentData?.businessId || (appointmentData as any)?.businessId || businessSettings.businessId;
+  const businessId = appointmentData?.businessId || (appointmentData as any)?.businessId;
   
   // Log for debugging (only in dev)
   if (process.env.NODE_ENV === 'development') {

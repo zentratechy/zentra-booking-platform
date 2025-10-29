@@ -106,7 +106,7 @@ export function generateEmailTemplate(
   
   // Extract clientId and businessId from any data structure
   const clientId = appointmentData?.clientId || (appointmentData as any)?.clientId;
-  const businessId = appointmentData?.businessId || (appointmentData as any)?.businessId || businessSettings.businessId;
+  const businessId = appointmentData?.businessId || (appointmentData as any)?.businessId;
   
   const colorScheme = getColorScheme(businessSettings.colorScheme || 'classic');
   
