@@ -52,8 +52,13 @@ export async function POST(request: Request) {
       console.log('📝 Generating booking confirmation email template');
       console.log('📝 Business settings:', businessSettings);
       console.log('📝 Appointment data:', JSON.stringify(appointmentData, null, 2));
-      console.log('📝 Business ID in appointmentData:', appointmentData.businessId);
-      console.log('📝 Client ID in appointmentData:', appointmentData.clientId);
+      console.log('📝 Business ID in appointmentData:', appointmentData.businessId, 'type:', typeof appointmentData.businessId);
+      console.log('📝 Client ID in appointmentData:', appointmentData.clientId, 'type:', typeof appointmentData.clientId);
+      // Ensure businessId is in appointmentData if not already
+      if (!appointmentData.businessId && businessId) {
+        appointmentData.businessId = businessId;
+        console.log('✅ Added businessId to appointmentData:', businessId);
+      }
       try {
         emailHtml = generateBookingConfirmationEmail(appointmentData, businessSettings);
         console.log('✅ Template generated, length:', emailHtml?.length);
