@@ -173,6 +173,37 @@ export async function GET(request: NextRequest) {
       // Continue anyway - we can save the connection without merchant info
     }
 
+    // Get location ID (required for payments)
+    let locationId = '';
+    try {
+      console.log('Square OAuth - Fetching locations...');
+      const locationsResponse = await fetch(`${baseUrl}/v2/locations`, {
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`,
+          'Square-Version': '2024-10-17',
+        },
+      });
+
+      if (locationsResponse.ok) {
+        const locationsData = await locationsResponse.json();
+        console.log('Square OAuth - Locations data received:', locationsData);
+        
+        if (locationsData.locations && locationsData.locations.length > 0) {
+          // Use the first location (or could let user choose, but first is most common)
+          locationId = locationsData.locations[0].id || '';
+          console.log('Square OAuth - Location ID:', locationId);
+          console.log('Square OAuth - Location Name:', locationsData.locations[0].name);
+        } else {
+          console.warn('Square OAuth - No locations found in response:', locationsData);
+        }
+      } else {
+        console.warn('Square OAuth - Failed to fetch locations:', locationsResponse.status, locationsResponse.statusText);
+      }
+    } catch (locationError) {
+      console.error('Square OAuth - Error fetching locations:', locationError);
+      // Continue anyway - user can manually configure location later if needed
+    }
+
     // Store the tokens and merchant info in Firestore
     try {
       console.log('Square OAuth - Saving to Firestore for business:', state);
@@ -189,6 +220,11 @@ export async function GET(request: NextRequest) {
       // Only add merchant name if we got it
       if (merchantName && merchantName !== 'Square Account') {
         updateData['paymentConfig.square.merchantName'] = merchantName;
+      }
+
+      // Only add location ID if we got it (required for payments)
+      if (locationId) {
+        updateData['paymentConfig.square.locationId'] = locationId;
       }
 
       await updateDoc(doc(db, 'businesses', state), updateData);

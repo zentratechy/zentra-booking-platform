@@ -10,6 +10,7 @@ import { awardLoyaltyPoints } from '@/lib/loyalty';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useToast } from '@/hooks/useToast';
+import { loadSquarePayments, createSquarePaymentRequest } from '@/lib/square';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -82,6 +83,138 @@ function PaymentForm({ appointment, onSuccess, colorScheme, remainingBalance, bu
   );
 }
 
+function SquarePaymentForm({ appointment, onSuccess, colorScheme, remainingBalance, business }: any) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [cardElement, setCardElement] = useState<any>(null);
+  const [payments, setPayments] = useState<any>(null);
+
+  useEffect(() => {
+    const initializeSquare = async () => {
+      try {
+        const squareAppId = process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID;
+        if (!squareAppId) {
+          setError('Square payment not configured');
+          return;
+        }
+
+        // Get location ID from business config
+        // If not stored, we'll need to fetch it from Square API
+        let locationId = business?.paymentConfig?.square?.locationId;
+        
+        if (!locationId) {
+          // Try to fetch locations from Square API
+          try {
+            const merchantId = business?.paymentConfig?.square?.merchantId;
+            if (merchantId) {
+              const isSandbox = business?.paymentConfig?.square?.sandboxMode;
+              const baseUrl = isSandbox ? 'https://connect.squareupsandbox.com' : 'https://connect.squareup.com';
+              
+              // Note: This requires server-side implementation to avoid exposing access token
+              // For now, we'll show an error message
+              setError('Location ID required. Please contact the business to complete Square setup.');
+              return;
+            }
+          } catch (fetchError) {
+            console.error('Error fetching Square locations:', fetchError);
+          }
+          
+          setError('Square location not configured. Please contact the business.');
+          return;
+        }
+        
+        const squarePayments = await loadSquarePayments(squareAppId, locationId);
+        setPayments(squarePayments);
+
+        if (squarePayments) {
+          const card = await squarePayments.card();
+          await card.attach('#square-card');
+          setCardElement(card);
+        }
+      } catch (err: any) {
+        console.error('Error initializing Square:', err);
+        setError('Failed to initialize payment system: ' + (err.message || 'Unknown error'));
+      }
+    };
+
+    if (business) {
+      initializeSquare();
+    }
+  }, [business]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!cardElement || !payments) {
+      setError('Payment system not ready');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const result = await cardElement.tokenize();
+      
+      if (result.status === 'OK') {
+        // Send token to server to create payment
+        const response = await fetch('/api/square/create-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            businessId: appointment.businessId,
+            amount: remainingBalance,
+            sourceId: result.token,
+            customerId: appointment.clientId,
+            referenceId: appointment.id,
+            note: `Payment for ${appointment.serviceName}`,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (data.success && data.payment) {
+          await onSuccess(data.payment, data.paymentId);
+        } else {
+          setError(data.error || 'Payment failed');
+          setLoading(false);
+        }
+      } else {
+        let errorMessage = 'Payment failed';
+        if (result.errors && result.errors.length > 0) {
+          errorMessage = result.errors[0].detail;
+        }
+        setError(errorMessage);
+        setLoading(false);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Payment failed');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div id="square-card" className="p-4 border border-gray-300 rounded-lg"></div>
+      
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          {error}
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={!cardElement || loading}
+        className="w-full text-white py-4 rounded-lg font-semibold text-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        style={{ backgroundColor: colorScheme.colors.primary }}
+      >
+        {loading ? 'Processing...' : `Pay ${formatPrice(remainingBalance, appointment.currency || business.currency)}`}
+      </button>
+    </form>
+  );
+}
+
 export default function PaymentPage() {
   const params = useParams();
   const router = useRouter();
@@ -97,6 +230,7 @@ export default function PaymentPage() {
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState<any>(null);
   const [voucherDiscount, setVoucherDiscount] = useState<number>(0);
+  const [paymentProvider, setPaymentProvider] = useState<'stripe' | 'square' | null>(null);
 
   useEffect(() => {
     fetchAppointment();
@@ -118,9 +252,10 @@ export default function PaymentPage() {
       setAppointment(aptData);
 
       // Fetch business
+      let businessData: any = null;
       const businessDoc = await getDoc(doc(db, 'businesses', aptData.businessId));
       if (businessDoc.exists()) {
-        const businessData = { id: businessDoc.id, ...businessDoc.data() } as any;
+        businessData = { id: businessDoc.id, ...businessDoc.data() } as any;
         setBusiness(businessData);
         
         const scheme = getColorScheme(businessData.colorScheme || 'purple-elegance');
@@ -137,39 +272,61 @@ export default function PaymentPage() {
       const remainingBalance = aptData.payment?.remainingBalance ?? (totalPrice - paidAmount);
       
       // Check if there's a remaining balance
-      if (remainingBalance > 0) {
-        // Create payment intent for remaining balance
-        const response = await fetch('/api/stripe/create-payment-intent', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            businessId: aptData.businessId,
-            serviceId: aptData.serviceId,
-            amount: remainingBalance,
-            isDeposit: false,
-            customerEmail: aptData.clientEmail,
-            customerName: aptData.clientName,
-            metadata: {
-              appointmentId: appointmentId,
-              clientName: aptData.clientName,
-              type: 'remaining_balance',
-            },
-          }),
-        });
+      if (remainingBalance > 0 && businessData) {
+        // Check which payment provider is connected
+        const detectedProvider = businessData.paymentProvider || businessData.paymentConfig?.provider;
+        const stripeConnected = detectedProvider === 'stripe' && (businessData.paymentConfig?.stripe?.connected || businessData.paymentConfig?.stripe?.accountId);
+        const squareConnected = detectedProvider === 'square' && businessData.paymentConfig?.square?.connected;
 
-        const data = await response.json();
-        console.log('Payment intent response:', { 
-          hasClientSecret: !!data.clientSecret, 
-          error: data.error,
-          status: response.status,
-          clientSecretPreview: data.clientSecret ? data.clientSecret.substring(0, 50) + '...' : null
-        });
-        
-        if (data.clientSecret && isValidClientSecret(data.clientSecret)) {
-          setClientSecret(data.clientSecret);
-        } else if (data.error) {
-          console.error('Error creating payment intent:', data.error);
-          // Don't show toast here, let the user see the error message instead
+        // Set payment provider state
+        if (stripeConnected) {
+          setPaymentProvider('stripe');
+        } else if (squareConnected) {
+          setPaymentProvider('square');
+        } else {
+          setPaymentProvider(null);
+        }
+
+        // Create payment intent/request based on connected provider
+        if (stripeConnected) {
+          // Create Stripe payment intent for remaining balance
+          const response = await fetch('/api/stripe/create-payment-intent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              businessId: aptData.businessId,
+              serviceId: aptData.serviceId,
+              amount: remainingBalance,
+              isDeposit: false,
+              customerEmail: aptData.clientEmail,
+              customerName: aptData.clientName,
+              metadata: {
+                appointmentId: appointmentId,
+                clientName: aptData.clientName,
+                type: 'remaining_balance',
+              },
+            }),
+          });
+
+          const data = await response.json();
+          console.log('Stripe payment intent response:', { 
+            hasClientSecret: !!data.clientSecret, 
+            error: data.error,
+            status: response.status,
+            clientSecretPreview: data.clientSecret ? data.clientSecret.substring(0, 50) + '...' : null
+          });
+          
+          if (data.clientSecret && isValidClientSecret(data.clientSecret)) {
+            setClientSecret(data.clientSecret);
+          } else if (data.error) {
+            console.error('Error creating Stripe payment intent:', data.error);
+          }
+        } else if (squareConnected) {
+          // Square payment will be handled via client-side Square Web Payments SDK
+          // No need to create payment intent server-side for Square
+          console.log('Square payment provider detected - will use Square Web Payments SDK');
+        } else {
+          console.warn('No payment provider connected for business:', aptData.businessId);
         }
       }
 
@@ -180,12 +337,13 @@ export default function PaymentPage() {
     }
   };
 
-  const handlePaymentSuccess = async () => {
+  const handlePaymentSuccess = async (squarePaymentData?: any, squarePaymentId?: string) => {
     try {
       const previousAmount = appointment.payment?.amount || 0;
       const totalPaid = previousAmount + (appointment.payment?.remainingBalance ?? (appointment.price - previousAmount));
 
-      await updateDoc(doc(db, 'appointments', appointmentId), {
+      // Build payment update object
+      const paymentUpdate: any = {
         'payment.status': 'paid',
         'payment.amount': totalPaid,
         'payment.remainingBalance': 0,
@@ -193,7 +351,18 @@ export default function PaymentPage() {
         ...(appliedVoucher?.code && { 'payment.voucherCode': appliedVoucher.code }),
         ...(voucherDiscount > 0 && { 'payment.voucherDiscount': voucherDiscount }),
         updatedAt: serverTimestamp(),
-      });
+      };
+
+      // Add Square payment info if this was a Square payment
+      if (squarePaymentId) {
+        paymentUpdate['payment.squarePaymentId'] = squarePaymentId;
+        paymentUpdate['payment.method'] = 'card';
+        if (squarePaymentData?.cardDetails?.card?.cardBrand) {
+          paymentUpdate['payment.cardBrand'] = squarePaymentData.cardDetails.card.cardBrand;
+        }
+      }
+
+      await updateDoc(doc(db, 'appointments', appointmentId), paymentUpdate);
 
       // Update client's totalSpent
       if (appointment.clientId) {
@@ -525,7 +694,7 @@ export default function PaymentPage() {
           </div>
 
           {/* Payment Form */}
-          {clientSecret && remainingBalance > 0 && isValidClientSecret(clientSecret) ? (
+          {paymentProvider === 'stripe' && clientSecret && remainingBalance > 0 && isValidClientSecret(clientSecret) ? (
             <Elements 
               stripe={stripePromise}
               options={{
@@ -546,16 +715,29 @@ export default function PaymentPage() {
                 business={business}
               />
             </Elements>
-          ) : remainingBalance > 0 && (!clientSecret || !isValidClientSecret(clientSecret)) ? (
+          ) : paymentProvider === 'square' && remainingBalance > 0 ? (
+            <SquarePaymentForm
+              appointment={appointment}
+              onSuccess={handlePaymentSuccess}
+              colorScheme={colorScheme}
+              remainingBalance={remainingBalance}
+              business={business}
+            />
+          ) : remainingBalance > 0 && !paymentProvider ? (
             <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700 mb-4">
               <p className="font-semibold mb-1">Payment processing unavailable</p>
               <p className="text-sm">The business may not have completed payment setup yet.</p>
               <p className="text-sm mt-2">Please contact {business.name} directly to complete your payment of {formatPrice(remainingBalance, appointment.currency || business.currency)}.</p>
             </div>
+          ) : remainingBalance > 0 && paymentProvider === 'stripe' && (!clientSecret || !isValidClientSecret(clientSecret)) ? (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700 mb-4">
+              <p className="font-semibold mb-1">Payment processing unavailable</p>
+              <p className="text-sm">Unable to initialize Stripe payment. Please try again or contact the business.</p>
+            </div>
           ) : null}
 
           <p className="text-xs text-center text-gray-500 mt-4">
-            Secure payment powered by Stripe
+            Secure payment powered by {paymentProvider === 'square' ? 'Square' : paymentProvider === 'stripe' ? 'Stripe' : 'Zentra'}
           </p>
         </div>
       </div>
