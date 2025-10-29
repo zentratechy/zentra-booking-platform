@@ -189,6 +189,12 @@ function PaymentsContent() {
       // Stripe refund
       if (paymentMethod === 'card' && selectedPayment.payment?.stripePaymentIntentId) {
         try {
+          console.log('Processing Stripe refund:', {
+            paymentIntentId: selectedPayment.payment.stripePaymentIntentId,
+            amount: refundAmount,
+            reason: refundReason
+          });
+          
           const refundResponse = await fetch('/api/stripe/create-refund', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -200,13 +206,27 @@ function PaymentsContent() {
           });
 
           const refundData = await refundResponse.json();
+          
+          if (!refundResponse.ok) {
+            console.error('❌ Stripe refund API error:', refundData);
+            throw new Error(refundData.error || 'Failed to process refund');
+          }
+          
           if (refundData.success) {
             refundId = refundData.refund.id;
+            console.log('✅ Stripe refund successful:', refundId);
           } else {
             console.error('❌ Stripe refund failed:', refundData.error);
+            throw new Error(refundData.error || 'Refund was not successful');
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error processing Stripe refund:', error);
+          setToast({ 
+            message: `Stripe refund failed: ${error.message || 'Please try again or contact support'}`, 
+            type: 'error' 
+          });
+          setProcessing(false);
+          return; // Stop processing if Stripe refund fails
         }
       }
       
