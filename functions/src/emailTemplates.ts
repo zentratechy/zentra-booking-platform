@@ -99,10 +99,15 @@ export function generateEmailTemplate(
   title: string,
   content: string,
   businessSettings: BusinessEmailSettings,
-  appointmentData?: AppointmentData
+  appointmentData?: AppointmentData | any // Allow any data type to extract clientId/businessId
 ) {
   // Get base URL from environment (for referral links)
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://zentrabooking.com';
+  
+  // Extract clientId and businessId from any data structure
+  const clientId = appointmentData?.clientId || (appointmentData as any)?.clientId;
+  const businessId = appointmentData?.businessId || (appointmentData as any)?.businessId || businessSettings.businessId;
+  
   const colorScheme = getColorScheme(businessSettings.colorScheme || 'classic');
   
   return `
@@ -349,8 +354,8 @@ export function generateEmailTemplate(
               Love our service? Refer a friend and you'll both earn bonus loyalty points when they book their first appointment!
             </p>
             <div style="text-align: center;">
-              ${appointmentData?.businessId && appointmentData?.clientId ? `
-              <a href="${baseUrl}/book/${appointmentData.businessId}?ref=${appointmentData.clientId}" 
+              ${businessId && clientId ? `
+              <a href="${baseUrl}/book/${businessId}?ref=${clientId}" 
                  style="display: inline-block; background: rgba(255,255,255,0.2); color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; border: 1px solid rgba(255,255,255,0.3); transition: all 0.3s ease;">
                 📱 Share Booking Link
               </a>
@@ -509,7 +514,8 @@ export function generatePaymentLinkEmail(
     </p>
   `;
 
-  return generateEmailTemplate('Payment Required', content, businessSettings);
+  // Pass paymentData to template so it can extract clientId/businessId for referral link
+  return generateEmailTemplate('Payment Required', content, businessSettings, paymentData);
 }
 
 // Generate reschedule confirmation email
@@ -568,7 +574,8 @@ export function generateRescheduleConfirmationEmail(
     </p>
   `;
 
-  return generateEmailTemplate('Appointment Rescheduled', content, businessSettings);
+  // Pass appointmentDetails to template so it can extract clientId/businessId for referral link
+  return generateEmailTemplate('Appointment Rescheduled', content, businessSettings, appointmentDetails);
 }
 
 // Generate voucher email
