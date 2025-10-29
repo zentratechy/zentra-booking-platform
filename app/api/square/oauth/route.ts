@@ -40,6 +40,14 @@ export async function GET(request: NextRequest) {
     }
     
     // Exchange authorization code for access token
+    console.log('Square OAuth - Exchanging authorization code for access token...');
+    console.log('Square OAuth - Request URL:', `${baseUrl}/oauth2/token`);
+    console.log('Square OAuth - Request body:', {
+      client_id: squareAppId?.substring(0, 20) + '...',
+      code: code ? 'present' : 'missing',
+      grant_type: 'authorization_code'
+    });
+
     const tokenResponse = await fetch(`${baseUrl}/oauth2/token`, {
       method: 'POST',
       headers: {
@@ -54,20 +62,55 @@ export async function GET(request: NextRequest) {
       }),
     });
 
-    const tokenData = await tokenResponse.json();
     console.log('Square OAuth - Token response status:', tokenResponse.status);
-    console.log('Square OAuth - Token response:', tokenData.error ? 'Error' : 'Success');
+    console.log('Square OAuth - Token response headers:', Object.fromEntries(tokenResponse.headers.entries()));
 
+    const tokenData = await tokenResponse.json();
+    console.log('Square OAuth - Token response body:', JSON.stringify(tokenData, null, 2));
+
+    // Check for HTTP errors first
+    if (!tokenResponse.ok) {
+      console.error('Square OAuth - HTTP Error:', tokenResponse.status, tokenResponse.statusText);
+      const errorMessage = tokenData.error_description || tokenData.error || `HTTP ${tokenResponse.status}`;
+      return NextResponse.redirect(new URL(`${origin}/dashboard/settings?square_error=${encodeURIComponent(errorMessage)}`, request.url));
+    }
+
+    // Check for Square API errors
+    if (tokenData.errors && Array.isArray(tokenData.errors) && tokenData.errors.length > 0) {
+      console.error('Square OAuth - API Errors:', tokenData.errors);
+      const firstError = tokenData.errors[0];
+      const errorMessage = firstError.detail || firstError.code || 'square_api_error';
+      return NextResponse.redirect(new URL(`${origin}/dashboard/settings?square_error=${encodeURIComponent(errorMessage)}`, request.url));
+    }
+
+    // Legacy error format
     if (tokenData.error) {
       console.error('Square OAuth error:', tokenData);
       const errorMessage = tokenData.error_description || tokenData.error || 'unknown_error';
       return NextResponse.redirect(new URL(`${origin}/dashboard/settings?square_error=${encodeURIComponent(errorMessage)}`, request.url));
     }
 
+    // Check for access token
     if (!tokenData.access_token) {
-      console.error('Square OAuth - No access token in response:', tokenData);
-      return NextResponse.redirect(new URL(`${origin}/dashboard/settings?square_error=no_access_token`, request.url));
+      console.error('Square OAuth - No access token in response');
+      console.error('Square OAuth - Full response:', JSON.stringify(tokenData, null, 2));
+      console.error('Square OAuth - Response keys:', Object.keys(tokenData));
+      
+      // Provide more specific error based on what we got
+      let errorMessage = 'no_access_token';
+      if (tokenData.error) {
+        errorMessage = tokenData.error;
+      } else if (tokenData.message) {
+        errorMessage = tokenData.message;
+      } else if (tokenData.errors && tokenData.errors.length > 0) {
+        errorMessage = tokenData.errors[0].detail || 'token_exchange_failed';
+      }
+      
+      return NextResponse.redirect(new URL(`${origin}/dashboard/settings?square_error=${encodeURIComponent(errorMessage)}`, request.url));
     }
+
+    console.log('Square OAuth - Access token received:', tokenData.access_token.substring(0, 20) + '...');
+    console.log('Square OAuth - Has refresh token:', !!tokenData.refresh_token);
 
     // Get merchant info
     let merchantId = '';
