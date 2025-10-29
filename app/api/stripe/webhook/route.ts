@@ -85,17 +85,48 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
 
         if (appointmentDoc.exists()) {
           const appointmentData = appointmentDoc.data();
+          
+          // Check if this payment intent has already been processed
+          // (frontend might have already updated it via handlePaymentSuccess)
+          const existingPaymentIntentId = appointmentData.payment?.stripePaymentIntentId;
+          const alreadyProcessed = existingPaymentIntentId === paymentIntent.id;
+          
+          if (alreadyProcessed) {
+            console.log('Payment intent already processed, skipping webhook update:', paymentIntent.id);
+            return;
+          }
+          
+          // Check if payment was already marked as paid via link (frontend processed it)
+          // If so, only update the payment intent ID if missing, but don't double-add amount
+          const alreadyPaidViaLink = appointmentData.payment?.paidViaLink && 
+                                     appointmentData.payment?.status === 'paid';
+          
+          let updateData: any = {
+            'payment.stripePaymentIntentId': paymentIntent.id,
+            updatedAt: serverTimestamp(),
+          };
+          
+          if (alreadyPaidViaLink) {
+            // Frontend already processed the payment, just ensure payment intent ID is stored
+            console.log('Payment already processed by frontend, only updating payment intent ID');
+            await updateDoc(appointmentRef, updateData);
+            return;
+          }
+          
+          // Process payment amount (first time webhook is processing this)
           const currentPaid = appointmentData.payment?.amount || 0;
           const totalPaid = currentPaid + amount;
           const remainingBalance = Math.max(0, (appointmentData.price || 0) - totalPaid);
 
-          await updateDoc(appointmentRef, {
+          updateData = {
+            ...updateData,
             'payment.status': remainingBalance <= 0 ? 'paid' : 'partial',
             'payment.amount': totalPaid,
             'payment.remainingBalance': remainingBalance,
-            'payment.stripePaymentIntentId': paymentIntent.id,
-            updatedAt: serverTimestamp(),
-          });
+            'payment.paidViaLink': true,
+          };
+
+          await updateDoc(appointmentRef, updateData);
 
           // Award loyalty points if applicable
           if (appointmentData.clientId && appointmentData.clientEmail) {

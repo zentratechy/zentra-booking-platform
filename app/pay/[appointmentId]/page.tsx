@@ -375,8 +375,12 @@ export default function PaymentPage() {
 
   const handlePaymentSuccess = async (squarePaymentData?: any, squarePaymentId?: string, stripePaymentIntentId?: string) => {
     try {
+      // Calculate the amount that was just paid (remaining balance)
+      const remainingBalance = appointment.payment?.remainingBalance ?? 
+                                (appointment.price - (appointment.payment?.amount || 0));
       const previousAmount = appointment.payment?.amount || 0;
-      const totalPaid = previousAmount + (appointment.payment?.remainingBalance ?? (appointment.price - previousAmount));
+      // Total paid = what was already paid + what was just paid now
+      const totalPaid = previousAmount + remainingBalance;
 
       // Build payment update object
       const paymentUpdate: any = {
