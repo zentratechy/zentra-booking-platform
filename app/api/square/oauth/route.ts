@@ -8,17 +8,36 @@ export async function GET(request: NextRequest) {
   const state = searchParams.get('state'); // This should be the businessId
   
   if (!code || !state) {
-    return NextResponse.redirect(new URL('/dashboard/settings?square_error=missing_params', request.url));
+    const origin = request.nextUrl.origin;
+    return NextResponse.redirect(new URL(`${origin}/dashboard/settings?square_error=missing_params`, request.url));
   }
 
   try {
     // Determine Square API base URL based on environment
-    const isSandbox = process.env.SQUARE_ENVIRONMENT === 'sandbox';
+    // Check both environment variable and app ID format
+    const squareAppId = process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID;
+    const squareEnv = process.env.SQUARE_ENVIRONMENT || process.env.NEXT_PUBLIC_SQUARE_ENVIRONMENT;
+    const isSandbox = squareEnv === 'sandbox' || squareAppId?.startsWith('sandbox-');
     const baseUrl = isSandbox ? 'https://connect.squareupsandbox.com' : 'https://connect.squareup.com';
     
-    console.log('Square OAuth - Environment:', process.env.SQUARE_ENVIRONMENT);
+    console.log('Square OAuth - Environment:', squareEnv);
+    console.log('Square OAuth - Is Sandbox:', isSandbox);
     console.log('Square OAuth - Base URL:', baseUrl);
-    console.log('Square OAuth - Application ID:', process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID?.substring(0, 20) + '...');
+    console.log('Square OAuth - Application ID:', squareAppId?.substring(0, 20) + '...');
+    console.log('Square OAuth - Authorization code received:', code ? 'yes' : 'no');
+    console.log('Square OAuth - State (businessId):', state);
+    
+    const origin = request.nextUrl.origin;
+    
+    if (!squareAppId) {
+      console.error('Square OAuth - Application ID not configured');
+      return NextResponse.redirect(new URL(`${origin}/dashboard/settings?square_error=app_id_missing`, request.url));
+    }
+
+    if (!process.env.SQUARE_APPLICATION_SECRET) {
+      console.error('Square OAuth - Application Secret not configured');
+      return NextResponse.redirect(new URL(`${origin}/dashboard/settings?square_error=app_secret_missing`, request.url));
+    }
     
     // Exchange authorization code for access token
     const tokenResponse = await fetch(`${baseUrl}/oauth2/token`, {
@@ -28,7 +47,7 @@ export async function GET(request: NextRequest) {
         'Square-Version': '2024-10-17',
       },
       body: JSON.stringify({
-        client_id: process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID,
+        client_id: squareAppId,
         client_secret: process.env.SQUARE_APPLICATION_SECRET,
         code,
         grant_type: 'authorization_code',
@@ -36,50 +55,96 @@ export async function GET(request: NextRequest) {
     });
 
     const tokenData = await tokenResponse.json();
+    console.log('Square OAuth - Token response status:', tokenResponse.status);
+    console.log('Square OAuth - Token response:', tokenData.error ? 'Error' : 'Success');
 
     if (tokenData.error) {
       console.error('Square OAuth error:', tokenData);
-      return NextResponse.redirect(new URL(`/dashboard/settings?square_error=${tokenData.error}`, request.url));
+      const errorMessage = tokenData.error_description || tokenData.error || 'unknown_error';
+      return NextResponse.redirect(new URL(`${origin}/dashboard/settings?square_error=${encodeURIComponent(errorMessage)}`, request.url));
+    }
+
+    if (!tokenData.access_token) {
+      console.error('Square OAuth - No access token in response:', tokenData);
+      return NextResponse.redirect(new URL(`${origin}/dashboard/settings?square_error=no_access_token`, request.url));
     }
 
     // Get merchant info
-    const merchantResponse = await fetch(`${baseUrl}/v2/merchants`, {
-      headers: {
-        'Authorization': `Bearer ${tokenData.access_token}`,
-        'Square-Version': '2024-10-17',
-      },
-    });
+    let merchantId = '';
+    let merchantName = 'Square Account';
+    try {
+      console.log('Square OAuth - Fetching merchant info...');
+      const merchantResponse = await fetch(`${baseUrl}/v2/merchants`, {
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`,
+          'Square-Version': '2024-10-17',
+        },
+      });
 
-    const merchantData = await merchantResponse.json();
-    const merchant = merchantData.merchant?.[0];
+      if (!merchantResponse.ok) {
+        console.warn('Square OAuth - Failed to fetch merchant info:', merchantResponse.status, merchantResponse.statusText);
+      } else {
+        const merchantData = await merchantResponse.json();
+        console.log('Square OAuth - Merchant data received:', merchantData);
+        
+        if (merchantData.merchant && merchantData.merchant.length > 0) {
+          const merchant = merchantData.merchant[0];
+          merchantId = merchant.id || '';
+          merchantName = merchant.business_name || 'Square Account';
+          console.log('Square OAuth - Merchant ID:', merchantId);
+          console.log('Square OAuth - Merchant Name:', merchantName);
+        } else {
+          console.warn('Square OAuth - No merchant found in response:', merchantData);
+        }
+      }
+    } catch (merchantError) {
+      console.error('Square OAuth - Error fetching merchant info:', merchantError);
+      // Continue anyway - we can save the connection without merchant info
+    }
 
     // Store the tokens and merchant info in Firestore
     try {
-      await updateDoc(doc(db, 'businesses', state), {
+      console.log('Square OAuth - Saving to Firestore for business:', state);
+      const updateData: any = {
         paymentProvider: 'square',
         'paymentConfig.square.connected': true,
         'paymentConfig.square.accessToken': tokenData.access_token,
-        'paymentConfig.square.refreshToken': tokenData.refresh_token,
-        'paymentConfig.square.merchantId': merchant?.id || '',
+        'paymentConfig.square.refreshToken': tokenData.refresh_token || '',
+        'paymentConfig.square.merchantId': merchantId,
         'paymentConfig.square.sandboxMode': isSandbox,
         'paymentConfig.square.connectedAt': new Date().toISOString(),
-      });
+      };
+
+      // Only add merchant name if we got it
+      if (merchantName && merchantName !== 'Square Account') {
+        updateData['paymentConfig.square.merchantName'] = merchantName;
+      }
+
+      await updateDoc(doc(db, 'businesses', state), updateData);
       
       console.log('Square OAuth - Successfully stored connection data for business:', state);
-    } catch (firestoreError) {
+      console.log('Square OAuth - Update data:', { ...updateData, accessToken: '***hidden***' });
+    } catch (firestoreError: any) {
       console.error('Square OAuth - Error storing to Firestore:', firestoreError);
-      return NextResponse.redirect(new URL('/dashboard/settings?square_error=storage_error', request.url));
+      console.error('Square OAuth - Error details:', {
+        code: firestoreError.code,
+        message: firestoreError.message,
+        businessId: state
+      });
+      return NextResponse.redirect(new URL(`${origin}/dashboard/settings?square_error=${encodeURIComponent(firestoreError.message || 'storage_error')}`, request.url));
     }
     
     // Redirect back to settings with success message
-    const redirectUrl = new URL('/dashboard/settings', request.url);
+    const redirectUrl = new URL(`${origin}/dashboard/settings`, request.url);
     redirectUrl.searchParams.set('square_connected', 'true');
-    redirectUrl.searchParams.set('merchant_name', merchant?.business_name || 'Square Account');
+    redirectUrl.searchParams.set('merchant_name', encodeURIComponent(merchantName));
 
+    console.log('Square OAuth - Redirecting to:', redirectUrl.toString());
     return NextResponse.redirect(redirectUrl);
   } catch (error: any) {
     console.error('Error in Square OAuth:', error);
-    return NextResponse.redirect(new URL('/dashboard/settings?square_error=server_error', request.url));
+    const origin = request.nextUrl.origin;
+    return NextResponse.redirect(new URL(`${origin}/dashboard/settings?square_error=${encodeURIComponent(error.message || 'server_error')}`, request.url));
   }
 }
 
