@@ -173,14 +173,10 @@ function PaymentsContent() {
   };
 
   const handleRefund = async () => {
-    console.log('🔄 handleRefund called', { selectedPayment, refundAmount, refundReason });
-    
     if (!selectedPayment || refundAmount <= 0) {
-      console.log('❌ Refund validation failed:', { hasSelectedPayment: !!selectedPayment, refundAmount });
       return;
     }
 
-    console.log('✅ Refund validation passed, starting refund process...');
     setProcessing(true);
     try {
       const appointmentRef = doc(db, 'appointments', selectedPayment.id);
@@ -192,22 +188,9 @@ function PaymentsContent() {
       let refundId = null;
       const paymentMethod = selectedPayment.payment?.method;
       
-      console.log('Refund check - Payment details:', {
-        paymentMethod,
-        hasStripePaymentIntentId: !!selectedPayment.payment?.stripePaymentIntentId,
-        stripePaymentIntentId: selectedPayment.payment?.stripePaymentIntentId,
-        payment: selectedPayment.payment
-      });
-      
       // Stripe refund
       if (paymentMethod === 'card' && selectedPayment.payment?.stripePaymentIntentId) {
         try {
-          console.log('Processing Stripe refund:', {
-            paymentIntentId: selectedPayment.payment.stripePaymentIntentId,
-            amount: refundAmount,
-            reason: refundReason
-          });
-          
           const refundResponse = await fetch('/api/stripe/create-refund', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -221,15 +204,12 @@ function PaymentsContent() {
           const refundData = await refundResponse.json();
           
           if (!refundResponse.ok) {
-            console.error('❌ Stripe refund API error:', refundData);
             throw new Error(refundData.error || 'Failed to process refund');
           }
           
           if (refundData.success) {
             refundId = refundData.refund.id;
-            console.log('✅ Stripe refund successful:', refundId);
           } else {
-            console.error('❌ Stripe refund failed:', refundData.error);
             throw new Error(refundData.error || 'Refund was not successful');
           }
         } catch (error: any) {
@@ -260,8 +240,6 @@ function PaymentsContent() {
           const refundData = await refundResponse.json();
           if (refundData.success) {
             refundId = refundData.refund.id;
-          } else {
-            console.error('❌ Square refund failed:', refundData.error);
           }
         } catch (error) {
           console.error('Error processing Square refund:', error);
@@ -955,16 +933,7 @@ function PaymentsContent() {
                 </button>
                 <button 
                   type="button"
-                  onClick={(e) => {
-                    console.log('🔘 Refund button clicked', {
-                      processing,
-                      refundAmount,
-                      refundReason,
-                      paymentAmount: selectedPayment.payment?.amount,
-                      disabled: processing || refundAmount <= 0 || !refundReason || refundAmount > (selectedPayment.payment?.amount || 0)
-                    });
-                    handleRefund();
-                  }}
+                  onClick={handleRefund}
                   disabled={processing || refundAmount <= 0 || !refundReason || refundAmount > (selectedPayment.payment?.amount || 0)}
                   className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-50"
                 >
