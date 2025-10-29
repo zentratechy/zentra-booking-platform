@@ -69,6 +69,7 @@ export async function POST(request: Request) {
       }
     } else if (type === 'payment_link' && paymentData) {
       console.log('📝 Generating payment link email template');
+      console.log('📝 Payment data - businessId:', paymentData.businessId, 'clientId:', paymentData.clientId);
       emailHtml = generatePaymentLinkEmail(paymentData, businessSettings);
     } else if (type === 'reschedule_confirmation' && appointmentDetails) {
       console.log('📝 Generating reschedule confirmation email template');

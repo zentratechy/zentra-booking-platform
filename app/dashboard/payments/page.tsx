@@ -1008,13 +1008,16 @@ function PaymentsContent() {
                               subject: `Payment Required - ${selectedPayment.serviceName}`,
                               type: 'payment_link',
                               businessId: user?.uid,
-                              paymentData: {
-                                customerName: selectedPayment.clientName,
-                                serviceName: selectedPayment.serviceName,
-                                amount: amountToPay,
-                                currency: currency,
-                                paymentLink: paymentLink,
-                              },
+                            paymentData: {
+                              customerName: selectedPayment.clientName,
+                              clientId: selectedPayment.clientId, // Include for referral link
+                              serviceName: selectedPayment.serviceName,
+                              amount: amountToPay,
+                              currency: currency,
+                              paymentLink: paymentLink,
+                              businessId: user?.uid, // Include for referral link
+                              businessName: businessData?.businessName || businessData?.name || '',
+                            },
                             }),
                           });
 
