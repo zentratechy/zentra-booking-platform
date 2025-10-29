@@ -1023,13 +1023,13 @@ export default function BookingPage() {
           status: paymentType === 'deposit' ? 'partial' : 'paid',
           method: 'card',
           amount: paymentType === 'deposit' ? 
-            Math.round(amountAfterVoucher * (selectedServices[0]?.depositPercentage || 30) / 100) : 
+            Math.round((amountAfterVoucher * (selectedServices[0]?.depositPercentage || 30) / 100) * 100) / 100 : 
             amountAfterVoucher,
           depositPaid: paymentType === 'deposit',
           depositPercentage: selectedServices[0]?.depositPercentage || 30,
           totalAmount: totalPrice,
           remainingBalance: paymentType === 'deposit' ? 
-            amountAfterVoucher - Math.round(amountAfterVoucher * (selectedServices[0]?.depositPercentage || 30) / 100) : 
+            Math.round((amountAfterVoucher - (amountAfterVoucher * (selectedServices[0]?.depositPercentage || 30) / 100)) * 100) / 100 : 
             0,
           stripePaymentIntentId: paymentIntentId || null,
           stripePaymentMethodId: paymentMethodId || null,
@@ -1104,11 +1104,11 @@ export default function BookingPage() {
         });
         
         const depositAmount = paymentType === 'deposit' ? 
-          Math.round(totalPrice * (selectedServices[0]?.depositPercentage || 30) / 100) : 
+          Math.round((totalPrice * (selectedServices[0]?.depositPercentage || 30) / 100) * 100) / 100 : 
           undefined;
         
         const remainingBalance = paymentType === 'deposit' ? 
-          totalPrice - Math.round(totalPrice * (selectedServices[0]?.depositPercentage || 30) / 100) : 
+          Math.round((totalPrice - (totalPrice * (selectedServices[0]?.depositPercentage || 30) / 100)) * 100) / 100 : 
           undefined;
 
         await fetch('/api/email/send', {
