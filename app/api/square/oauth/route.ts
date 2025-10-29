@@ -40,12 +40,21 @@ export async function GET(request: NextRequest) {
     }
     
     // Exchange authorization code for access token
+    // Square requires redirect_uri to match the one used in authorization request
+    let domain = new URL(request.url).hostname;
+    if (domain.startsWith('www.')) {
+      domain = domain.substring(4); // Remove 'www.'
+    }
+    const redirectUri = `https://${domain}/api/square/oauth`;
+    
     console.log('Square OAuth - Exchanging authorization code for access token...');
     console.log('Square OAuth - Request URL:', `${baseUrl}/oauth2/token`);
+    console.log('Square OAuth - Redirect URI:', redirectUri);
     console.log('Square OAuth - Request body:', {
       client_id: squareAppId?.substring(0, 20) + '...',
       code: code ? 'present' : 'missing',
-      grant_type: 'authorization_code'
+      grant_type: 'authorization_code',
+      redirect_uri: redirectUri
     });
 
     const tokenResponse = await fetch(`${baseUrl}/oauth2/token`, {
@@ -59,6 +68,7 @@ export async function GET(request: NextRequest) {
         client_secret: process.env.SQUARE_APPLICATION_SECRET,
         code,
         grant_type: 'authorization_code',
+        redirect_uri: redirectUri, // Square requires this to match the authorization request
       }),
     });
 

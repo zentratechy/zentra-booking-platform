@@ -126,6 +126,7 @@ function SettingsContent() {
       
       const errorMessages: { [key: string]: string } = {
         'missing_params': 'Missing authorization parameters. Please try connecting again.',
+        'missing required parameter \'redirect_uri\'': 'OAuth configuration error. This has been fixed - please try connecting again.',
         'server_error': 'Server error during connection. Please try again in a moment.',
         'storage_error': 'Error saving connection data. Please contact support.',
         'access_denied': 'Square authorization was denied. Please try again.',
