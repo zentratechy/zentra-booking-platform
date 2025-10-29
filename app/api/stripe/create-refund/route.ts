@@ -16,11 +16,18 @@ export async function POST(request: Request) {
       );
     }
 
+    // First, retrieve the payment intent to check if it has a connected account
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    
     // Create refund
+    // For payments with transfer_data.destination, set reverse_transfer: true
+    // This automatically reverses the transfer from the connected account back to platform
     const refund = await stripe.refunds.create({
       payment_intent: paymentIntentId,
       amount: amount ? Math.round(amount * 100) : undefined, // Convert to cents, undefined = full refund
       reason: 'requested_by_customer', // Stripe only accepts: duplicate, fraudulent, or requested_by_customer
+      // Reverse the transfer from connected account back to platform
+      reverse_transfer: paymentIntent.transfer_data?.destination ? true : false,
       metadata: {
         refund_reason: reason || 'Customer request', // Store custom reason in metadata
       },
