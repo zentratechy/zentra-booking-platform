@@ -588,43 +588,22 @@ function SettingsContent() {
 
 
 
-  const handleConnectStripe = async (useExistingAccount: boolean = false) => {
+  const handleConnectStripe = async () => {
     setConnectingStripe(true);
     try {
-      // If user wants to connect existing account, use OAuth flow
-      if (useExistingAccount) {
-        // Normalize domain - remove www if present for consistency
-        let domain = window.location.hostname;
-        if (domain.startsWith('www.')) {
-          domain = domain.substring(4);
-        }
-        const redirectUri = `https://${domain}/api/stripe/oauth`;
-        const state = user!.uid;
-        
-        // Use Stripe OAuth to connect existing account
-        // This will allow businesses to either connect an existing Stripe account
-        // or create a new one through Stripe's onboarding
-        const stripeClientId = process.env.NEXT_PUBLIC_STRIPE_CLIENT_ID;
-        
-        if (!stripeClientId) {
-          showToast('Stripe OAuth not configured. Please contact support.', 'error');
-          setConnectingStripe(false);
-          return;
-        }
-
-        const oauthUrl = `https://connect.stripe.com/oauth/authorize?response_type=code&client_id=${encodeURIComponent(stripeClientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read_write&state=${encodeURIComponent(state)}`;
-        
-        // Redirect to Stripe OAuth
-        window.location.href = oauthUrl;
+      // Validate required data
+      if (!user?.email) {
+        showToast('User email is required', 'error');
+        setConnectingStripe(false);
         return;
       }
 
-      // Otherwise, create new account (existing flow)
+      // Create Stripe Connect account (businesses can connect existing or create new during onboarding)
       const response = await fetch('/api/stripe/create-connect-account', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          email: user?.email,
+          email: user.email,
           businessName: businessData?.businessName || businessData?.ownerName || 'Business'
         }),
       });
@@ -632,6 +611,11 @@ function SettingsContent() {
       const data = await response.json();
 
       if (!response.ok) {
+        console.error('Stripe connection error:', {
+          status: response.status,
+          error: data.error,
+          fullResponse: data
+        });
         showToast(data.error || 'Failed to connect Stripe', 'error');
         setConnectingStripe(false);
         return;
@@ -656,7 +640,7 @@ function SettingsContent() {
         const linkData = await linkResponse.json();
 
         if (linkData.url) {
-          // Keep loading state while redirecting
+          // Redirect to Stripe onboarding (businesses can connect existing or create new account here)
           window.location.href = linkData.url;
         } else {
           setConnectingStripe(false);
@@ -1846,28 +1830,17 @@ function SettingsContent() {
                           )}
                         </div>
                       ) : (
-                        <div className="flex flex-col items-end space-y-2">
-                          <button
-                            onClick={() => handleConnectStripe(true)}
-                            disabled={connectingStripe}
-                            className="px-4 py-2 text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-                            style={{ backgroundColor: colorScheme.colors.primary }}
-                            title="Connect your existing Stripe account"
-                          >
-                            {connectingStripe && (
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            )}
-                            <span>{connectingStripe ? 'Connecting...' : 'Connect Existing Account'}</span>
-                          </button>
-                          <button
-                            onClick={() => handleConnectStripe(false)}
-                            disabled={connectingStripe}
-                            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Create a new Stripe account"
-                          >
-                            or Create New Account
-                          </button>
-                        </div>
+                        <button
+                          onClick={handleConnectStripe}
+                          disabled={connectingStripe}
+                          className="px-4 py-2 text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                          style={{ backgroundColor: colorScheme.colors.primary }}
+                        >
+                          {connectingStripe && (
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          )}
+                          <span>{connectingStripe ? 'Connecting...' : 'Connect Stripe'}</span>
+                        </button>
                       )}
                     </div>
                   </div>
