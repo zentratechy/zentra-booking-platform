@@ -1120,6 +1120,13 @@ export default function BookingPage() {
 
       // Send confirmation email
       try {
+        // Verify clientId is set before sending email
+        if (!clientId) {
+          console.error('⚠️ clientId is missing, cannot include referral link in email');
+        } else {
+          console.log('✅ clientId available for email:', clientId);
+        }
+
         const appointmentDate = selectedDate!.toLocaleDateString('en-US', { 
           weekday: 'long', 
           year: 'numeric', 
@@ -1135,6 +1142,44 @@ export default function BookingPage() {
           Math.round((totalPrice - (totalPrice * (selectedServices[0]?.depositPercentage || 30) / 100)) * 100) / 100 : 
           undefined;
 
+        const emailAppointmentData = {
+          customerName: clientInfo.name,
+          ...(clientId && { clientId }), // Only include if clientId exists
+          clientEmail: clientInfo.email,
+          ...(businessId && { businessId }), // Only include if businessId exists
+          businessName: business?.businessName || '',
+          serviceName: selectedServices.length === 1 ? selectedServices[0].name : `${selectedServices.length} Services`,
+          services: selectedServices.map(s => ({
+            name: s.name,
+            duration: s.duration,
+            price: s.price
+          })),
+          staffName: assignedStaff?.name || 'Any Available Staff',
+          locationName: selectedLocation?.name || 'Main Location',
+          locationAddress: selectedLocation?.address || business?.address || '',
+          appointmentDate: appointmentDate,
+          appointmentTime: selectedTime,
+          duration: getTotalDuration(),
+          bufferTime: selectedServices.reduce((max, service) => Math.max(max, service.bufferTime || 0), 0),
+          totalPrice: totalPrice,
+          currency: business?.currency || 'usd',
+          depositPaid: paymentType === 'deposit',
+          depositAmount,
+          remainingBalance,
+          businessAddress: business?.address || '',
+          businessPhone: business?.phone || '',
+          businessEmail: business?.email || '',
+          notes: clientInfo.notes,
+          appointmentId: appointmentId
+        };
+
+        console.log('📧 Sending booking confirmation email with appointmentData:', {
+          hasClientId: !!emailAppointmentData.clientId,
+          hasBusinessId: !!emailAppointmentData.businessId,
+          clientId: emailAppointmentData.clientId,
+          businessId: emailAppointmentData.businessId
+        });
+
         await fetch('/api/email/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1143,36 +1188,7 @@ export default function BookingPage() {
             subject: `Booking Confirmation - ${selectedServices.length === 1 ? selectedServices[0].name : `${selectedServices.length} Services`}`,
             type: 'booking_confirmation',
             businessId: businessId,
-            appointmentData: {
-              customerName: clientInfo.name,
-              clientId: clientId, // Include clientId for referral link generation
-              clientEmail: clientInfo.email,
-              businessId: businessId,
-              businessName: business?.businessName || '',
-              serviceName: selectedServices.length === 1 ? selectedServices[0].name : `${selectedServices.length} Services`,
-              services: selectedServices.map(s => ({
-                name: s.name,
-                duration: s.duration,
-                price: s.price
-              })),
-              staffName: assignedStaff?.name || 'Any Available Staff',
-              locationName: selectedLocation?.name || 'Main Location',
-              locationAddress: selectedLocation?.address || business?.address || '',
-              appointmentDate: appointmentDate,
-              appointmentTime: selectedTime,
-              duration: getTotalDuration(),
-              bufferTime: selectedServices.reduce((max, service) => Math.max(max, service.bufferTime || 0), 0),
-              totalPrice: totalPrice,
-              currency: business?.currency || 'usd',
-              depositPaid: paymentType === 'deposit',
-              depositAmount,
-              remainingBalance,
-              businessAddress: business?.address || '',
-              businessPhone: business?.phone || '',
-              businessEmail: business?.email || '',
-              notes: clientInfo.notes,
-              appointmentId: appointmentId
-            },
+            appointmentData: emailAppointmentData,
           }),
         });
       } catch (emailError) {
