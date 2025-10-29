@@ -186,6 +186,13 @@ function PaymentsContent() {
       let refundId = null;
       const paymentMethod = selectedPayment.payment?.method;
       
+      console.log('Refund check - Payment details:', {
+        paymentMethod,
+        hasStripePaymentIntentId: !!selectedPayment.payment?.stripePaymentIntentId,
+        stripePaymentIntentId: selectedPayment.payment?.stripePaymentIntentId,
+        payment: selectedPayment.payment
+      });
+      
       // Stripe refund
       if (paymentMethod === 'card' && selectedPayment.payment?.stripePaymentIntentId) {
         try {

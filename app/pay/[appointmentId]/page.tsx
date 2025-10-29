@@ -20,6 +20,7 @@ function isValidClientSecret(secret: string | null | undefined): boolean {
 }
 
 function PaymentForm({ appointment, onSuccess, colorScheme, remainingBalance, business }: any) {
+  // onSuccess signature: (squarePaymentData?: any, squarePaymentId?: string, stripePaymentIntentId?: string)
   const stripe = useStripe();
   const elements = useElements();
   const [loading, setLoading] = useState(false);
@@ -41,7 +42,7 @@ function PaymentForm({ appointment, onSuccess, colorScheme, remainingBalance, bu
         return;
       }
 
-      const { error: confirmError } = await stripe.confirmPayment({
+      const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
           return_url: `${window.location.origin}/payment-success?appointmentId=${appointment.id}`,
@@ -53,7 +54,8 @@ function PaymentForm({ appointment, onSuccess, colorScheme, remainingBalance, bu
         setError(confirmError.message || 'Payment failed');
         setLoading(false);
       } else {
-        await onSuccess();
+        // Pass payment intent ID to onSuccess so it can be stored
+        await onSuccess(undefined, undefined, paymentIntent?.id);
       }
     } catch (err: any) {
       setError(err.message || 'Payment failed');
@@ -371,7 +373,7 @@ export default function PaymentPage() {
     }
   };
 
-  const handlePaymentSuccess = async (squarePaymentData?: any, squarePaymentId?: string) => {
+  const handlePaymentSuccess = async (squarePaymentData?: any, squarePaymentId?: string, stripePaymentIntentId?: string) => {
     try {
       const previousAmount = appointment.payment?.amount || 0;
       const totalPaid = previousAmount + (appointment.payment?.remainingBalance ?? (appointment.price - previousAmount));
@@ -386,6 +388,12 @@ export default function PaymentPage() {
         ...(voucherDiscount > 0 && { 'payment.voucherDiscount': voucherDiscount }),
         updatedAt: serverTimestamp(),
       };
+
+      // Add Stripe payment info if this was a Stripe payment
+      if (stripePaymentIntentId) {
+        paymentUpdate['payment.stripePaymentIntentId'] = stripePaymentIntentId;
+        paymentUpdate['payment.method'] = 'card';
+      }
 
       // Add Square payment info if this was a Square payment
       if (squarePaymentId) {
