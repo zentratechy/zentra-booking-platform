@@ -112,8 +112,50 @@ function SettingsContent() {
 
     fetchData();
     
-    // Check for Square connection results in URL
+    // Check for Stripe connection results in URL
     const urlParams = new URLSearchParams(window.location.search);
+    const stripeConnected = urlParams.get('stripe_connected');
+    const stripeError = urlParams.get('stripe_error');
+    const accountId = urlParams.get('account_id');
+    
+    if (stripeConnected === 'true') {
+      showToast(`Stripe connected successfully${accountId ? ` (${accountId.slice(0, 8)}...)` : ''}!`, 'success');
+      // Clean up URL and refresh to update connection status
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // Refresh business data to show updated connection
+      (async () => {
+        const businessDoc = await getDoc(doc(db, 'businesses', user!.uid));
+        if (businessDoc.exists()) {
+          setBusinessData(businessDoc.data());
+        }
+      })();
+    } else if (stripeError) {
+      // Decode the error message (it might be URL encoded)
+      const decodedError = decodeURIComponent(stripeError);
+      
+      const errorMessages: { [key: string]: string } = {
+        'missing_params': 'Missing authorization parameters. Please try connecting again.',
+        'server_error': 'Server error during connection. Please try again in a moment.',
+        'storage_error': 'Error saving connection data. Please contact support.',
+        'no_account_id': 'Failed to receive account ID from Stripe. Please try connecting again.',
+      };
+      
+      // Check if it's a known error or show the decoded error
+      const errorMessage = errorMessages[decodedError] || errorMessages[stripeError] || decodedError || stripeError;
+      showToast(`Stripe connection failed: ${errorMessage}`, 'error');
+      
+      // Log for debugging
+      console.error('Stripe connection error:', {
+        rawError: stripeError,
+        decodedError: decodedError,
+        message: errorMessage
+      });
+      
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    
+    // Check for Square connection results in URL
     const squareConnected = urlParams.get('square_connected');
     const squareError = urlParams.get('square_error');
     const merchantName = urlParams.get('merchant_name');
@@ -546,9 +588,38 @@ function SettingsContent() {
 
 
 
-  const handleConnectStripe = async () => {
+  const handleConnectStripe = async (useExistingAccount: boolean = false) => {
     setConnectingStripe(true);
     try {
+      // If user wants to connect existing account, use OAuth flow
+      if (useExistingAccount) {
+        // Normalize domain - remove www if present for consistency
+        let domain = window.location.hostname;
+        if (domain.startsWith('www.')) {
+          domain = domain.substring(4);
+        }
+        const redirectUri = `https://${domain}/api/stripe/oauth`;
+        const state = user!.uid;
+        
+        // Use Stripe OAuth to connect existing account
+        // This will allow businesses to either connect an existing Stripe account
+        // or create a new one through Stripe's onboarding
+        const stripeClientId = process.env.NEXT_PUBLIC_STRIPE_CLIENT_ID;
+        
+        if (!stripeClientId) {
+          showToast('Stripe OAuth not configured. Please contact support.', 'error');
+          setConnectingStripe(false);
+          return;
+        }
+
+        const oauthUrl = `https://connect.stripe.com/oauth/authorize?response_type=code&client_id=${encodeURIComponent(stripeClientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read_write&state=${encodeURIComponent(state)}`;
+        
+        // Redirect to Stripe OAuth
+        window.location.href = oauthUrl;
+        return;
+      }
+
+      // Otherwise, create new account (existing flow)
       const response = await fetch('/api/stripe/create-connect-account', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1775,17 +1846,28 @@ function SettingsContent() {
                           )}
                         </div>
                       ) : (
-                        <button
-                          onClick={handleConnectStripe}
-                          disabled={connectingStripe}
-                          className="px-4 py-2 text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-                          style={{ backgroundColor: colorScheme.colors.primary }}
-                        >
-                          {connectingStripe && (
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          )}
-                          <span>{connectingStripe ? 'Connecting...' : 'Connect Stripe'}</span>
-                        </button>
+                        <div className="flex flex-col items-end space-y-2">
+                          <button
+                            onClick={() => handleConnectStripe(true)}
+                            disabled={connectingStripe}
+                            className="px-4 py-2 text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                            style={{ backgroundColor: colorScheme.colors.primary }}
+                            title="Connect your existing Stripe account"
+                          >
+                            {connectingStripe && (
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            )}
+                            <span>{connectingStripe ? 'Connecting...' : 'Connect Existing Account'}</span>
+                          </button>
+                          <button
+                            onClick={() => handleConnectStripe(false)}
+                            disabled={connectingStripe}
+                            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Create a new Stripe account"
+                          >
+                            or Create New Account
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
