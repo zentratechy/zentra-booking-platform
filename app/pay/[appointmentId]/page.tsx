@@ -103,24 +103,48 @@ function SquarePaymentForm({ appointment, onSuccess, colorScheme, remainingBalan
         let locationId = business?.paymentConfig?.square?.locationId;
         
         if (!locationId) {
-          // Try to fetch locations from Square API
+          // Try to fetch location ID automatically
+          console.log('Square location ID missing, attempting to fetch...');
+          if (!appointment?.businessId) {
+            setError('Business information not available. Please refresh the page.');
+            return;
+          }
+
           try {
-            const merchantId = business?.paymentConfig?.square?.merchantId;
-            if (merchantId) {
-              const isSandbox = business?.paymentConfig?.square?.sandboxMode;
-              const baseUrl = isSandbox ? 'https://connect.squareupsandbox.com' : 'https://connect.squareup.com';
+            const fetchResponse = await fetch('/api/square/fetch-locations', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                businessId: appointment.businessId,
+              }),
+            });
+
+            const fetchData = await fetchResponse.json();
+            
+            if (fetchData.success && fetchData.selectedLocation) {
+              console.log('Square location ID fetched successfully:', fetchData.selectedLocation.id);
+              locationId = fetchData.selectedLocation.id;
               
-              // Note: This requires server-side implementation to avoid exposing access token
-              // For now, we'll show an error message
-              setError('Location ID required. Please contact the business to complete Square setup.');
+              // Retry initialization with the fetched location ID
+              const squarePayments = await loadSquarePayments(squareAppId, locationId);
+              setPayments(squarePayments);
+
+              if (squarePayments) {
+                const card = await squarePayments.card();
+                await card.attach('#square-card');
+                setCardElement(card);
+              }
+              return; // Success, exit early
+            } else {
+              console.error('Failed to fetch location ID:', fetchData.error);
+              setError(fetchData.error || 'Square location setup incomplete. Please contact the business.');
               return;
             }
           } catch (fetchError) {
             console.error('Error fetching Square locations:', fetchError);
+            setError('Square location not configured. Please contact the business.');
+            return;
           }
-          
-          setError('Square location not configured. Please contact the business.');
-          return;
         }
         
         const squarePayments = await loadSquarePayments(squareAppId, locationId);
@@ -137,10 +161,10 @@ function SquarePaymentForm({ appointment, onSuccess, colorScheme, remainingBalan
       }
     };
 
-    if (business) {
+    if (business && appointment) {
       initializeSquare();
     }
-  }, [business]);
+  }, [business, appointment]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
