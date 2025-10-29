@@ -838,7 +838,11 @@ function PaymentsContent() {
                 {(selectedPayment.payment?.status === 'paid' || selectedPayment.payment?.status === 'partial') && (
                   <button
                     onClick={() => {
-                      setRefundAmount(selectedPayment.payment?.amount || 0);
+                      // Default to service price, but don't exceed what was actually paid
+                      const servicePrice = selectedPayment.price || 0;
+                      const paidAmount = selectedPayment.payment?.amount || 0;
+                      // Default to the minimum of service price or paid amount
+                      setRefundAmount(Math.min(servicePrice, paidAmount));
                       setShowRefundModal(true);
                     }}
                     className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors flex items-center"
@@ -879,13 +883,20 @@ function PaymentsContent() {
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-700">Amount Paid:</span>
-                  <span className="font-semibold text-gray-900">{formatPrice(selectedPayment.payment?.amount || 0, currency)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
                   <span className="text-gray-700">Service Total:</span>
                   <span className="font-semibold text-gray-900">{formatPrice(selectedPayment.price || 0, currency)}</span>
                 </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-700">Amount Paid:</span>
+                  <span className="font-semibold text-gray-900">{formatPrice(selectedPayment.payment?.amount || 0, currency)}</span>
+                </div>
+                {(selectedPayment.payment?.amount || 0) > (selectedPayment.price || 0) && (
+                  <div className="mt-2 pt-2 border-t border-blue-300">
+                    <p className="text-xs text-orange-700">
+                      ⚠️ Note: Amount paid exceeds service total. This may indicate a deposit or multiple payments.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-4">
@@ -895,7 +906,7 @@ function PaymentsContent() {
                     type="number"
                     value={refundAmount}
                     onChange={(e) => setRefundAmount(parseFloat(e.target.value) || 0)}
-                    max={selectedPayment.payment?.amount || 0}
+                    max={Math.max(selectedPayment.payment?.amount || 0, selectedPayment.price || 0)}
                     min="0"
                     step="0.01"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
