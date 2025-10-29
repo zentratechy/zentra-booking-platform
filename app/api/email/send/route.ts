@@ -51,10 +51,18 @@ export async function POST(request: Request) {
     if (type === 'booking_confirmation' && appointmentData) {
       console.log('📝 Generating booking confirmation email template');
       console.log('📝 Business settings:', businessSettings);
-      console.log('📝 Appointment data:', appointmentData);
+      console.log('📝 Appointment data:', JSON.stringify(appointmentData, null, 2));
+      console.log('📝 Business ID in appointmentData:', appointmentData.businessId);
+      console.log('📝 Client ID in appointmentData:', appointmentData.clientId);
       try {
         emailHtml = generateBookingConfirmationEmail(appointmentData, businessSettings);
         console.log('✅ Template generated, length:', emailHtml?.length);
+        // Check if referral link is in the HTML
+        if (emailHtml.includes('Share Booking Link')) {
+          console.log('✅ Referral link section found in HTML');
+        } else {
+          console.log('⚠️ Referral link section NOT found in HTML');
+        }
       } catch (templateError) {
         console.error('❌ Error generating template:', templateError);
         throw templateError;
