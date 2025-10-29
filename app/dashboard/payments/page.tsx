@@ -173,8 +173,14 @@ function PaymentsContent() {
   };
 
   const handleRefund = async () => {
-    if (!selectedPayment || refundAmount <= 0) return;
+    console.log('🔄 handleRefund called', { selectedPayment, refundAmount, refundReason });
+    
+    if (!selectedPayment || refundAmount <= 0) {
+      console.log('❌ Refund validation failed:', { hasSelectedPayment: !!selectedPayment, refundAmount });
+      return;
+    }
 
+    console.log('✅ Refund validation passed, starting refund process...');
     setProcessing(true);
     try {
       const appointmentRef = doc(db, 'appointments', selectedPayment.id);
@@ -938,7 +944,16 @@ function PaymentsContent() {
                 </button>
                 <button 
                   type="button"
-                  onClick={handleRefund}
+                  onClick={(e) => {
+                    console.log('🔘 Refund button clicked', {
+                      processing,
+                      refundAmount,
+                      refundReason,
+                      paymentAmount: selectedPayment.payment?.amount,
+                      disabled: processing || refundAmount <= 0 || !refundReason || refundAmount > (selectedPayment.payment?.amount || 0)
+                    });
+                    handleRefund();
+                  }}
                   disabled={processing || refundAmount <= 0 || !refundReason || refundAmount > (selectedPayment.payment?.amount || 0)}
                   className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-50"
                 >
