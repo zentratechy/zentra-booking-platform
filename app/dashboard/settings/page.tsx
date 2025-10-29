@@ -79,6 +79,8 @@ function SettingsContent() {
     zipCode: '',
   });
   const [exportingData, setExportingData] = useState(false);
+  const [editingStripeAccountId, setEditingStripeAccountId] = useState(false);
+  const [stripeAccountIdInput, setStripeAccountIdInput] = useState('');
   
   // Get color scheme for styling
   const colorScheme = getColorScheme(selectedColorScheme);
@@ -655,6 +657,32 @@ function SettingsContent() {
       console.error('Error connecting Square:', error);
       showToast('Failed to connect Square: ' + error.message, 'error');
       setConnectingSquare(false);
+    }
+  };
+
+  const handleUpdateStripeAccountId = async () => {
+    if (!stripeAccountIdInput.trim() || !stripeAccountIdInput.startsWith('acct_')) {
+      showToast('Please enter a valid Stripe account ID (must start with acct_)', 'error');
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, 'businesses', user!.uid), {
+        'paymentConfig.stripe.accountId': stripeAccountIdInput.trim(),
+      });
+
+      // Refresh business data
+      const businessDoc = await getDoc(doc(db, 'businesses', user!.uid));
+      if (businessDoc.exists()) {
+        setBusinessData(businessDoc.data());
+      }
+
+      setEditingStripeAccountId(false);
+      setStripeAccountIdInput('');
+      showToast('Stripe account ID updated successfully', 'success');
+    } catch (error: any) {
+      console.error('Error updating Stripe account ID:', error);
+      showToast('Failed to update Stripe account ID: ' + error.message, 'error');
     }
   };
 
@@ -1686,21 +1714,65 @@ function SettingsContent() {
                           <span className="text-sm text-gray-500">Checking...</span>
                         </div>
                       ) : stripeConnected ? (
-                        <div className="flex items-center space-x-2">
-                          <span className="px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
-                            Connected
-                          </span>
-                          {businessData?.paymentConfig?.stripe?.accountId && (
-                            <span className="text-xs text-gray-500">
-                              Account: {businessData.paymentConfig.stripe.accountId.slice(0, 8)}...
+                        <div className="flex flex-col items-end space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <span className="px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
+                              Connected
                             </span>
+                            <button
+                              onClick={handleDisconnectStripe}
+                              className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-800 text-sm font-medium rounded-full transition-colors"
+                            >
+                              Disconnect
+                            </button>
+                          </div>
+                          {businessData?.paymentConfig?.stripe?.accountId && (
+                            <div className="flex items-center space-x-2 w-full">
+                              {editingStripeAccountId ? (
+                                <div className="flex items-center space-x-2 flex-1">
+                                  <input
+                                    type="text"
+                                    value={stripeAccountIdInput || businessData.paymentConfig.stripe.accountId}
+                                    onChange={(e) => setStripeAccountIdInput(e.target.value)}
+                                    placeholder="acct_..."
+                                    className="flex-1 px-3 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                                    style={{ maxWidth: '200px' }}
+                                  />
+                                  <button
+                                    onClick={handleUpdateStripeAccountId}
+                                    className="px-2 py-1 bg-green-100 hover:bg-green-200 text-green-800 text-xs font-medium rounded transition-colors"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingStripeAccountId(false);
+                                      setStripeAccountIdInput('');
+                                    }}
+                                    className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-medium rounded transition-colors"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center space-x-2 flex-1">
+                                  <span className="text-xs text-gray-500">
+                                    Account: {businessData.paymentConfig.stripe.accountId}
+                                  </span>
+                                  <button
+                                    onClick={() => {
+                                      setStripeAccountIdInput(businessData.paymentConfig.stripe.accountId);
+                                      setEditingStripeAccountId(true);
+                                    }}
+                                    className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-medium rounded transition-colors"
+                                    title="Edit Account ID"
+                                  >
+                                    Edit
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           )}
-                          <button
-                            onClick={handleDisconnectStripe}
-                            className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-800 text-sm font-medium rounded-full transition-colors"
-                          >
-                            Disconnect
-                          </button>
                         </div>
                       ) : (
                         <button
