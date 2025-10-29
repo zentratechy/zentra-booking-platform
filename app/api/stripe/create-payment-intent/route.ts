@@ -52,28 +52,29 @@ export async function POST(request: NextRequest) {
       ? Math.round(amount)
       : Math.round(amount * 100);
 
-    console.log('Creating payment intent on connected account:', stripeAccountId);
+    console.log('Creating payment intent for connected account:', stripeAccountId);
 
-    // Create payment intent directly on the connected account
-    // This ensures payments go directly to the business's Stripe account, not through Zentra
+    // Create payment intent on platform account (will be transferred to connected account after payment)
+    // This approach works better with Stripe Elements using the platform's publishable key
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInSmallestUnit,
       currency: currency,
       payment_method_types: ['card'], // Only allow card payments, disable Google Pay
+      // Use application_fee_amount if you want to take a platform fee
+      // Otherwise, use transfer_data to specify where funds should go
+      transfer_data: {
+        destination: stripeAccountId, // Funds will be transferred to connected account
+      },
       metadata: {
         ...metadata,
         businessId,
         serviceId,
-        stripeAccountId, // Store for reference
+        stripeAccountId, // Store connected account ID for reference
         isDeposit: isDeposit ? 'true' : 'false',
       },
-    }, {
-      // Use stripeAccount in request options to create payment on connected account
-      // Payments will go directly to the business's account
-      stripeAccount: stripeAccountId,
     });
 
-    console.log('Payment intent created on connected account:', paymentIntent.id);
+    console.log('Payment intent created with transfer to connected account:', paymentIntent.id);
 
     return NextResponse.json({
       clientSecret: paymentIntent.client_secret,

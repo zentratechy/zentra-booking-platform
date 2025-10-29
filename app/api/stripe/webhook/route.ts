@@ -69,12 +69,12 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
       metadata: metadata,
     });
 
-    // Note: Payment was created directly on the connected account using stripeAccount parameter
-    // So the funds are already in the business's account - no transfer needed
+    // Note: Payment intent uses transfer_data.destination to automatically transfer funds
+    // to the connected account. No manual transfer needed - Stripe handles it automatically
     if (stripeAccountId) {
-      console.log('Payment was created on connected account:', stripeAccountId, '- funds are already in business account, no transfer needed');
+      console.log('Payment will be automatically transferred to connected account:', stripeAccountId);
     } else {
-      console.warn('No stripeAccountId found in metadata - payment may be on platform account');
+      console.warn('No stripeAccountId found in metadata - funds will stay on platform account');
     }
 
     // Update appointment payment status if appointmentId is provided
