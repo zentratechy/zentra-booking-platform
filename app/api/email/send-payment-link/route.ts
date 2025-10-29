@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
           </div>
           
           <div style="background: #faf8f5; padding: 30px; border-radius: 12px; margin-bottom: 30px;">
-            <h2 style="color: #8b7355; margin-top: 0;">Hi ${clientName},</h2>
+            <h2 style="color: #8b7355; margin-top: 0;">Hi ${clientName || 'Customer'},</h2>
             <p style="font-size: 16px; line-height: 1.6; color: #333;">
               Thank you for booking with ${businessName}! Please complete your payment for the following service:
             </p>

@@ -461,7 +461,7 @@ export function generatePaymentLinkEmail(
 ) {
   const content = `
     <p style="font-size: 18px; margin-bottom: 25px; font-family: Georgia, serif;">
-      Dear <strong style="color: #8b7355;">${paymentData.customerName}</strong>,
+      Dear <strong style="color: #8b7355;">${paymentData.customerName || 'Customer'}</strong>,
     </p>
     
     <div class="divider"></div>
