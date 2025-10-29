@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { db } from '@/lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -24,9 +26,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Fetch business data for email personalization
+    let businessName = 'Your Business';
+    let businessEmail = 'noreply@mail.zentrabooking.com';
+    
+    if (businessId) {
+      try {
+        const businessDoc = await getDoc(doc(db, 'businesses', businessId));
+        if (businessDoc.exists()) {
+          const businessData = businessDoc.data();
+          businessName = businessData.businessName || businessData.name || 'Your Business';
+          businessEmail = businessData.email || 'noreply@mail.zentrabooking.com';
+        }
+      } catch (error) {
+        console.error('Error fetching business data:', error);
+        // Continue with defaults
+      }
+    }
+
     // Send email using Resend
     const { data, error } = await resend.emails.send({
-      from: 'Zentra <noreply@zentra.app>', // Update with your domain
+      from: `${businessName} <noreply@mail.zentrabooking.com>`,
+      replyTo: businessEmail,
       to: [clientEmail],
       subject: `Payment Link - ${serviceName}`,
       html: `
@@ -38,7 +59,7 @@ export async function POST(request: NextRequest) {
           <div style="background: #faf8f5; padding: 30px; border-radius: 12px; margin-bottom: 30px;">
             <h2 style="color: #8b7355; margin-top: 0;">Hi ${clientName},</h2>
             <p style="font-size: 16px; line-height: 1.6; color: #333;">
-              Thank you for booking with us! Please complete your payment for the following service:
+              Thank you for booking with ${businessName}! Please complete your payment for the following service:
             </p>
             
             <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #d4a574; margin: 20px 0;">
@@ -60,8 +81,8 @@ export async function POST(request: NextRequest) {
           </div>
           
           <div style="text-align: center; color: #666; font-size: 12px;">
-            <p>If you have any questions, please contact us.</p>
-            <p>© 2025 Zentra. All rights reserved.</p>
+            <p>If you have any questions, please contact ${businessName}.</p>
+            <p>© 2025 ${businessName}. All rights reserved.</p>
           </div>
         </div>
       `,

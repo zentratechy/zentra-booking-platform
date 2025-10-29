@@ -60,6 +60,7 @@ function PaymentsContent() {
   const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'paid' | 'pending' | 'partial'>('all');
   const [currency, setCurrency] = useState('usd');
+  const [businessData, setBusinessData] = useState<any>(null);
   const [selectedPayment, setSelectedPayment] = useState<any>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showRefundModal, setShowRefundModal] = useState(false);
@@ -87,11 +88,12 @@ function PaymentsContent() {
         }
         
         const result = await response.json();
-        const { appointments: appointmentsData, business: businessData } = result.data;
+        const { appointments: appointmentsData, business: fetchedBusinessData } = result.data;
         
-        // Set business currency
-        if (businessData) {
-          setCurrency(businessData.currency || 'usd');
+        // Set business data and currency
+        if (fetchedBusinessData) {
+          setBusinessData(fetchedBusinessData);
+          setCurrency(fetchedBusinessData.currency || 'usd');
         }
         
         setAppointments(appointmentsData);
@@ -1005,13 +1007,13 @@ function PaymentsContent() {
                               to: selectedPayment.clientEmail,
                               subject: `Payment Required - ${selectedPayment.serviceName}`,
                               type: 'payment_link',
+                              businessId: user?.uid,
                               paymentData: {
                                 clientName: selectedPayment.clientName,
                                 serviceName: selectedPayment.serviceName,
                                 amount: amountToPay,
                                 currency: currency,
                                 paymentLink: paymentLink,
-                                businessName: user?.displayName || 'Your Salon',
                               },
                             }),
                           });
