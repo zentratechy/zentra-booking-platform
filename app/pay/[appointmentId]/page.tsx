@@ -126,7 +126,8 @@ function SquarePaymentForm({ appointment, onSuccess, colorScheme, remainingBalan
               locationId = fetchData.selectedLocation.id;
               
               // Retry initialization with the fetched location ID
-              const squarePayments = await loadSquarePayments(squareAppId, locationId);
+              const isSandbox = business?.paymentConfig?.square?.sandboxMode || squareAppId?.startsWith('sandbox-');
+              const squarePayments = await loadSquarePayments(squareAppId, locationId, isSandbox);
               setPayments(squarePayments);
 
               if (squarePayments) {
@@ -147,7 +148,8 @@ function SquarePaymentForm({ appointment, onSuccess, colorScheme, remainingBalan
           }
         }
         
-        const squarePayments = await loadSquarePayments(squareAppId, locationId);
+        const isSandbox = business?.paymentConfig?.square?.sandboxMode || squareAppId?.startsWith('sandbox-');
+        const squarePayments = await loadSquarePayments(squareAppId, locationId, isSandbox);
         setPayments(squarePayments);
 
         if (squarePayments) {
@@ -157,7 +159,15 @@ function SquarePaymentForm({ appointment, onSuccess, colorScheme, remainingBalan
         }
       } catch (err: any) {
         console.error('Error initializing Square:', err);
-        setError('Failed to initialize payment system: ' + (err.message || 'Unknown error'));
+        
+        // Handle specific Square environment mismatch error
+        if (err.message?.includes('SANDBOX_ON_PRODUCTION')) {
+          setError('Square sandbox cannot be used on production domains. Please contact the business - they need to switch to production Square credentials.');
+        } else if (err.message?.includes('ApplicationIdEnvironmentMismatchError') || err.message?.includes('environment mismatch')) {
+          setError('Square payment configuration error. The business needs to update their Square settings.');
+        } else {
+          setError('Failed to initialize payment system: ' + (err.message || 'Unknown error'));
+        }
       }
     };
 
