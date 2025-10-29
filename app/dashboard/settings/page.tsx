@@ -579,12 +579,20 @@ function SettingsContent() {
   const handleConnectSquare = async () => {
     setConnectingSquare(true);
     try {
-      // For sandbox testing, just mark as connected
       const squareAppId = process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID;
       const isSandbox = squareAppId?.startsWith('sandbox-');
 
-      // Always use OAuth flow (both sandbox and production)
-      // Sandbox OAuth will connect to Square's sandbox environment
+      // Square OAuth requires user to be logged into Square dashboard first
+      // Show helpful message and open Square dashboard in new tab
+      const squareDashboardUrl = isSandbox
+        ? 'https://app.squareupsandbox.com/dashboard/'
+        : 'https://squareup.com/dashboard/';
+
+      // Open Square dashboard in new tab so user can log in if needed
+      window.open(squareDashboardUrl, '_blank');
+      
+      // Show toast with instructions
+      showToast('Opening Square dashboard. Please ensure you are logged in, then authorize Zentra.', 'info');
       
       // Normalize domain - remove www if present for consistency
       let domain = window.location.hostname;
@@ -617,8 +625,10 @@ function SettingsContent() {
         return;
       }
       
-      // Keep loading state while redirecting
-      window.location.href = oauthUrl;
+      // Wait a moment for the Square dashboard to open, then redirect to OAuth
+      setTimeout(() => {
+        window.location.href = oauthUrl;
+      }, 1000);
     } catch (error: any) {
       console.error('Error connecting Square:', error);
       showToast('Failed to connect Square: ' + error.message, 'error');
