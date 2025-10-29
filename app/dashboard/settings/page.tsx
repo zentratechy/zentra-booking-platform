@@ -585,19 +585,37 @@ function SettingsContent() {
 
       // Always use OAuth flow (both sandbox and production)
       // Sandbox OAuth will connect to Square's sandbox environment
-      const redirectUri = `${window.location.origin}/api/square/oauth`;
+      
+      // Normalize domain - remove www if present for consistency
+      let domain = window.location.hostname;
+      if (domain.startsWith('www.')) {
+        domain = domain.substring(4); // Remove 'www.'
+      }
+      const redirectUri = `https://${domain}/api/square/oauth`;
       const state = user!.uid;
       const scope = encodeURIComponent('MERCHANT_PROFILE_READ PAYMENTS_WRITE PAYMENTS_READ');
 
+      // Square OAuth base URL - MUST use connect subdomain
       const baseUrl = isSandbox
         ? 'https://connect.squareupsandbox.com'
         : 'https://connect.squareup.com';
 
-      const oauthUrl = `${baseUrl}/oauth2/authorize?client_id=${squareAppId}&scope=${scope}&state=${state}&session=false&redirect_uri=${encodeURIComponent(redirectUri)}`;
+      // Construct OAuth URL with proper encoding
+      const oauthUrl = `${baseUrl}/oauth2/authorize?client_id=${encodeURIComponent(squareAppId!)}&scope=${scope}&state=${encodeURIComponent(state)}&session=false&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
       console.log('Square OAuth URL:', oauthUrl);
       console.log('Redirect URI:', redirectUri);
+      console.log('Domain (normalized):', domain);
       console.log('Square App ID:', squareAppId);
+      console.log('Base URL:', baseUrl);
+      
+      // Verify the URL contains 'connect.' before redirecting
+      if (!oauthUrl.includes('connect.')) {
+        console.error('ERROR: OAuth URL missing connect subdomain!', oauthUrl);
+        showToast('Square OAuth configuration error. Please contact support.', 'error');
+        setConnectingSquare(false);
+        return;
+      }
       
       // Keep loading state while redirecting
       window.location.href = oauthUrl;
