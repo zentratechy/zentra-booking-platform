@@ -36,6 +36,7 @@ function SettingsContent() {
   const [checkingConnections, setCheckingConnections] = useState(false);
   const [connectingStripe, setConnectingStripe] = useState(false);
   const [connectingSquare, setConnectingSquare] = useState(false);
+  const [stripeAccountStatus, setStripeAccountStatus] = useState<any>(null);
   
   // Location modal states
   const [showLocationModal, setShowLocationModal] = useState(false);
@@ -216,13 +217,16 @@ function SettingsContent() {
             body: JSON.stringify({ accountId: businessData.paymentConfig.stripe.accountId })
           });
           const stripeData = await stripeResponse.json();
+          setStripeAccountStatus(stripeData);
           setStripeConnected(stripeData.connected || false);
         } catch (error) {
           console.error('Error checking Stripe connection:', error);
           setStripeConnected(false);
+          setStripeAccountStatus(null);
         }
       } else {
         setStripeConnected(false);
+        setStripeAccountStatus(null);
       }
 
       // Check Square connection
@@ -651,6 +655,37 @@ function SettingsContent() {
     } catch (error: any) {
       console.error('Error connecting Stripe:', error);
       showToast('Failed to connect Stripe: ' + error.message, 'error');
+      setConnectingStripe(false);
+    }
+  };
+
+  const handleCompleteStripeSetup = async () => {
+    if (!user || !businessData?.paymentConfig?.stripe?.accountId) return;
+    
+    setConnectingStripe(true);
+    try {
+      const linkResponse = await fetch('/api/stripe/account-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: businessData.paymentConfig.stripe.accountId,
+          returnUrl: `${window.location.origin}/dashboard/settings?stripe_connected=true`,
+          refreshUrl: `${window.location.origin}/dashboard/settings`,
+        }),
+      });
+
+      const linkData = await linkResponse.json();
+
+      if (linkData.url) {
+        // Redirect to Stripe onboarding to complete setup
+        window.location.href = linkData.url;
+      } else {
+        setConnectingStripe(false);
+        showToast('Failed to generate setup link', 'error');
+      }
+    } catch (error: any) {
+      console.error('Error completing Stripe setup:', error);
+      showToast('Failed to complete Stripe setup: ' + error.message, 'error');
       setConnectingStripe(false);
     }
   };
@@ -1767,6 +1802,28 @@ function SettingsContent() {
                         <div className="flex items-center space-x-2">
                           <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
                           <span className="text-sm text-gray-500">Checking...</span>
+                        </div>
+                      ) : businessData?.paymentConfig?.stripe?.accountId && stripeAccountStatus && !stripeAccountStatus.connected ? (
+                        <div className="flex flex-col items-end space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-sm font-medium rounded-full">
+                              Setup Incomplete
+                            </span>
+                          </div>
+                          <button
+                            onClick={handleCompleteStripeSetup}
+                            disabled={connectingStripe}
+                            className="px-4 py-2 text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                            style={{ backgroundColor: colorScheme.colors.primary }}
+                          >
+                            {connectingStripe && (
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            )}
+                            <span>{connectingStripe ? 'Loading...' : 'Complete Setup'}</span>
+                          </button>
+                          <span className="text-xs text-gray-500 text-right">
+                            Account: {businessData.paymentConfig.stripe.accountId.slice(0, 8)}...
+                          </span>
                         </div>
                       ) : stripeConnected ? (
                         <div className="flex flex-col items-end space-y-2">
