@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Square OAuth Direct Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-link {
+            display: block;
+            margin: 20px 0;
+            padding: 15px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .test-link:hover {
+            background: #0056b3;
+        }
+        .info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Square OAuth Direct Test</h1>
+    
+    <div class="info">
+        <p><strong>Purpose:</strong> Test Square OAuth URL directly to bypass any JavaScript issues.</p>
+        <p><strong>Expected:</strong> You should see Square's authorization page asking you to allow Zentra access.</p>
+        <p><strong>If you see 400 error:</strong> The redirect URI <code>https://zentrabooking.com/api/square/oauth</code> is not added to your Square app.</p>
+    </div>
+    
+    <h2>Test Links:</h2>
+    
+    <a href="https://connect.squareupsandbox.com/oauth2/authorize?client_id=sandbox-sq0idb-OCfkSCT-pn7rk8GQ2kEgNQ&scope=MERCHANT_PROFILE_READ%20PAYMENTS_WRITE%20PAYMENTS_READ&state=direct-test&session=false&redirect_uri=https%3A%2F%2Fzentrabooking.com%2Fapi%2Fsquare%2Foauth" 
+       class="test-link" 
+       target="_blank">
+        Test 1: Connect to Square OAuth (with connect subdomain)
+    </a>
+    
+    <a href="https://squareupsandbox.com/oauth2/authorize?client_id=sandbox-sq0idb-OCfkSCT-pn7rk8GQ2kEgNQ&scope=MERCHANT_PROFILE_READ%20PAYMENTS_WRITE%20PAYMENTS_READ&state=direct-test&session=false&redirect_uri=https%3A%2F%2Fzentrabooking.com%2Fapi%2Fsquare%2Foauth" 
+       class="test-link" 
+       target="_blank">
+        Test 2: Connect to Square OAuth (without connect subdomain)
+    </a>
+    
+    <div class="info">
+        <h3>Square Configuration Checklist:</h3>
+        <ul>
+            <li>✅ Square App ID: <code>sandbox-sq0idb-OCfkSCT-pn7rk8GQ2kEgNQ</code></li>
+            <li>❓ Redirect URI in Square: <code>https://zentrabooking.com/api/square/oauth</code></li>
+            <li>❓ OAuth enabled in Square app settings</li>
+            <li>❓ App is in sandbox mode</li>
+        </ul>
+    </div>
+    
+    <div class="info">
+        <h3>What to Check:</h3>
+        <ol>
+            <li>Go to <a href="https://developer.squareup.com/apps" target="_blank">Square Developer Dashboard</a></li>
+            <li>Click on your Square app</li>
+            <li>Go to "OAuth" tab</li>
+            <li>Check "Redirect URLs" section</li>
+            <li>Verify you see: <code>https://zentrabooking.com/api/square/oauth</code></li>
+            <li>If not present, click "Add" or "+" and add it exactly as shown</li>
+            <li>Save the changes</li>
+            <li>Wait 1-2 minutes for Square to propagate the changes</li>
+            <li>Try the test links above again</li>
+        </ol>
+    </div>
+</body>
+</html>
