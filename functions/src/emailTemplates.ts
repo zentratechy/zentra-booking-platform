@@ -101,6 +101,8 @@ export function generateEmailTemplate(
   businessSettings: BusinessEmailSettings,
   appointmentData?: AppointmentData
 ) {
+  // Get base URL from environment (for referral links)
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://zentrabooking.com';
   const colorScheme = getColorScheme(businessSettings.colorScheme || 'classic');
   
   return `

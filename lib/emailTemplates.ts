@@ -103,6 +103,18 @@ export function generateEmailTemplate(
 ) {
   const colorScheme = getColorScheme(businessSettings.colorScheme || 'classic');
   
+  // Get base URL from environment (for referral links)
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://zentrabooking.com';
+  
+  // Log for debugging (only in dev)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Email template - appointmentData:', {
+      businessId: appointmentData?.businessId,
+      clientId: appointmentData?.clientId,
+      baseUrl
+    });
+  }
+  
   return `
     <!DOCTYPE html>
     <html>
