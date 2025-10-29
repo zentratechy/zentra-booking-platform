@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
 export async function POST(request: Request) {
+  let paymentIntentId: string | undefined;
+  
   try {
     // Check if Stripe secret key is configured
     if (!process.env.STRIPE_SECRET_KEY) {
@@ -15,7 +17,9 @@ export async function POST(request: Request) {
       apiVersion: '2025-09-30.clover',
     });
 
-    const { paymentIntentId, amount, reason } = await request.json();
+    const requestData = await request.json();
+    paymentIntentId = requestData.paymentIntentId;
+    const { amount, reason } = requestData;
 
     if (!paymentIntentId) {
       return NextResponse.json(
