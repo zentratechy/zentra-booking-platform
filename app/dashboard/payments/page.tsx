@@ -1019,10 +1019,20 @@ function PaymentsContent() {
 
                           console.log('📨 Sending payment link email with payload:', payload);
 
-                          const response = await fetch('/api/email/send', {
+                          // Prefer dedicated endpoint that embeds referral link robustly
+                          const response = await fetch('/api/email/send-payment-link', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload),
+                            body: JSON.stringify({
+                              appointmentId: selectedPayment.id,
+                              clientEmail: selectedPayment.clientEmail,
+                              clientName: selectedPayment.clientName,
+                              amount: amountToPay,
+                              serviceName: selectedPayment.serviceName,
+                              paymentLink,
+                              businessId: user?.uid,
+                              clientId: selectedPayment.clientId,
+                            }),
                           });
 
                           if (response.ok) {
