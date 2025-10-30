@@ -387,7 +387,6 @@ export function generateEmailTemplate(
                  style="display: inline-block; background: rgba(255,255,255,0.2); color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; border: 1px solid rgba(255,255,255,0.3); transition: all 0.3s ease;">
                 📱 Share Booking Link
               </a>
-              <div style="color: rgba(255,255,255,0.9); font-size: 12px; margin-top: 10px; word-break: break-all;">${referralUrl}</div>
             </div>
             <p style="color: rgba(255,255,255,0.8); font-size: 12px; margin: 15px 0 0 0; font-style: italic;">
               Copy and share this link with friends to earn referral rewards!
