@@ -107,6 +107,9 @@ export function generateEmailTemplate(
   // Extract clientId and businessId from any data structure
   const clientId = appointmentData?.clientId || (appointmentData as any)?.clientId;
   const businessId = appointmentData?.businessId || (appointmentData as any)?.businessId;
+  const referralUrl = (typeof businessId === 'string' && typeof clientId === 'string' && businessId && clientId)
+    ? `${baseUrl}/book/${businessId}?ref=${clientId}`
+    : '';
   
   const colorScheme = getColorScheme(businessSettings.colorScheme || 'classic');
   
@@ -353,14 +356,15 @@ export function generateEmailTemplate(
             <p style="color: #ffffff; font-size: 14px; margin: 0 0 15px 0; line-height: 1.6;">
               Love our service? Refer a friend and you'll both earn bonus loyalty points when they book their first appointment!
             </p>
+            ${referralUrl ? `
             <div style="text-align: center;">
-              ${businessId && clientId && typeof businessId === 'string' && typeof clientId === 'string' && businessId !== 'undefined' && clientId !== 'undefined' ? `
-              <a href="${baseUrl}/book/${businessId}?ref=${clientId}" 
+              <a href="${referralUrl}" 
                  style="display: inline-block; background: rgba(255,255,255,0.2); color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; border: 1px solid rgba(255,255,255,0.3); transition: all 0.3s ease;">
                 📱 Share Booking Link
               </a>
-              ` : ''}
+              <div style="color: rgba(255,255,255,0.9); font-size: 12px; margin-top: 10px; word-break: break-all;">${referralUrl}</div>
             </div>
+            ` : ''}
             <p style="color: rgba(255,255,255,0.8); font-size: 12px; margin: 15px 0 0 0; font-style: italic;">
               Copy and share this link with friends to earn referral rewards!
             </p>
