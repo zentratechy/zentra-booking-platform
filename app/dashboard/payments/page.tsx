@@ -1000,14 +1000,11 @@ function PaymentsContent() {
                           
                           const amountToPay = selectedPayment.payment?.remainingBalance || selectedPayment.price || 0;
                           
-                          const response = await fetch('/api/email/send', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              to: selectedPayment.clientEmail,
-                              subject: `Payment Required - ${selectedPayment.serviceName}`,
-                              type: 'payment_link',
-                              businessId: user?.uid,
+                          const payload = {
+                            to: selectedPayment.clientEmail,
+                            subject: `Payment Required - ${selectedPayment.serviceName}`,
+                            type: 'payment_link',
+                            businessId: user?.uid,
                             paymentData: {
                               customerName: selectedPayment.clientName,
                               clientId: selectedPayment.clientId, // Include for referral link
@@ -1018,13 +1015,22 @@ function PaymentsContent() {
                               businessId: user?.uid, // Include for referral link
                               businessName: businessData?.businessName || businessData?.name || '',
                             },
-                            }),
+                          };
+
+                          console.log('📨 Sending payment link email with payload:', payload);
+
+                          const response = await fetch('/api/email/send', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload),
                           });
 
                           if (response.ok) {
                             setToast({ message: `✅ Payment link sent to ${selectedPayment.clientEmail}!`, type: 'success' });
                           } else {
-                            throw new Error('Failed to send email');
+                            const text = await response.text();
+                            console.error('❌ Email send failed:', response.status, text);
+                            throw new Error(text || 'Failed to send email');
                           }
                         } catch (error: any) {
                           setToast({ message: 'Failed to send email: ' + error.message, type: 'error' });
