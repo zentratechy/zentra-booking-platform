@@ -24,6 +24,8 @@ function LoyaltyContent() {
     birthdayBonus: 50,
     referralBonus: 100,
     expirationMonths: 12,
+    birthdayEnabled: true,
+    referralEnabled: true,
   });
   const [businessCurrency, setBusinessCurrency] = useState('usd');
   const [showAddRewardModal, setShowAddRewardModal] = useState(false);
@@ -68,11 +70,21 @@ function LoyaltyContent() {
               birthdayBonus: 50,
               referralBonus: 100,
               expirationMonths: 12,
+              birthdayEnabled: true,
+              referralEnabled: true,
             });
           } else {
             setProgramActive(data.loyaltyProgram?.active ?? true);
             if (data.loyaltyProgram?.settings) {
-              setLoyaltySettings(data.loyaltyProgram.settings);
+              const s = data.loyaltyProgram.settings;
+              setLoyaltySettings({
+                pointsPerDollar: s.pointsPerDollar ?? 1,
+                birthdayBonus: s.birthdayBonus ?? 50,
+                referralBonus: s.referralBonus ?? 100,
+                expirationMonths: s.expirationMonths ?? 12,
+                birthdayEnabled: (s.birthday?.enabled ?? s.birthdayEnabled ?? true),
+                referralEnabled: (s.referral?.enabled ?? s.referralEnabled ?? true),
+              });
             }
           }
         }
@@ -334,7 +346,7 @@ function LoyaltyContent() {
                   <div className="flex items-center justify-between p-4 bg-soft-pink/20 rounded-lg">
                     <div>
                       <div className="font-medium text-gray-900">Birthday Bonus: {loyaltySettings.birthdayBonus} points</div>
-                      <div className="text-sm text-gray-600">Automatic on client's birthday</div>
+                      <div className="text-sm text-gray-600">Automatic on client's birthday • {loyaltySettings.birthdayEnabled ? 'On' : 'Off'}</div>
                     </div>
                     <button 
                       onClick={() => setShowEditSettingsModal(true)}
@@ -347,7 +359,7 @@ function LoyaltyContent() {
                   <div className="flex items-center justify-between p-4 bg-soft-pink/20 rounded-lg">
                     <div>
                       <div className="font-medium text-gray-900">Referral Bonus: {loyaltySettings.referralBonus} points</div>
-                      <div className="text-sm text-gray-600">When referred friend books first appointment</div>
+                      <div className="text-sm text-gray-600">When referred friend books first appointment • {loyaltySettings.referralEnabled ? 'On' : 'Off'}</div>
                     </div>
                     <button 
                       onClick={() => setShowEditSettingsModal(true)}
@@ -606,6 +618,15 @@ function LoyaltyContent() {
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
                 />
                 <p className="text-xs text-gray-600 mt-1">Bonus points on client's birthday</p>
+                <div className="mt-2 flex items-center space-x-2">
+                  <input
+                    id="birthdayEnabled"
+                    type="checkbox"
+                    checked={loyaltySettings.birthdayEnabled}
+                    onChange={(e) => setLoyaltySettings({ ...loyaltySettings, birthdayEnabled: e.target.checked })}
+                  />
+                  <label htmlFor="birthdayEnabled" className="text-sm text-gray-700">Enable Birthday Bonus</label>
+                </div>
               </div>
 
               <div>
@@ -618,6 +639,15 @@ function LoyaltyContent() {
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
                 />
                 <p className="text-xs text-gray-600 mt-1">Points when a referred client books</p>
+                <div className="mt-2 flex items-center space-x-2">
+                  <input
+                    id="referralEnabled"
+                    type="checkbox"
+                    checked={loyaltySettings.referralEnabled}
+                    onChange={(e) => setLoyaltySettings({ ...loyaltySettings, referralEnabled: e.target.checked })}
+                  />
+                  <label htmlFor="referralEnabled" className="text-sm text-gray-700">Enable Referral Bonus</label>
+                </div>
               </div>
 
               <div>

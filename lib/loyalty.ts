@@ -126,8 +126,15 @@ export async function awardReferralPoints(
       return false;
     }
 
+    // Check if referral bonuses are enabled
+    const referralEnabled = (loyaltyProgram.settings?.referral?.enabled ?? loyaltyProgram.settings?.referralEnabled ?? true) === true;
+    if (!referralEnabled) {
+      console.log('Referral bonus disabled in loyalty settings');
+      return false;
+    }
+
     // Get referral bonus points (default to 100)
-    const referralBonus = loyaltyProgram.settings?.referralBonus || 100;
+    const referralBonus = (loyaltyProgram.settings?.referral?.points ?? loyaltyProgram.settings?.referralBonus) || 100;
 
     if (referralBonus <= 0) {
       console.log('Referral bonus is set to 0, skipping');

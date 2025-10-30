@@ -107,7 +107,10 @@ export function generateEmailTemplate(
   // Extract clientId and businessId from any data structure
   const clientId = appointmentData?.clientId || (appointmentData as any)?.clientId;
   const businessId = appointmentData?.businessId || (appointmentData as any)?.businessId;
-  const referralUrl = (typeof businessId === 'string' && typeof clientId === 'string' && businessId && clientId)
+  // Respect referral toggle in business settings
+  const referralEnabled = (businessSettings as any)?.loyaltyProgram?.settings?.referral?.enabled ??
+                          (businessSettings as any)?.loyaltyProgram?.settings?.referralEnabled ?? true;
+  const referralUrl = referralEnabled && (typeof businessId === 'string' && typeof clientId === 'string' && businessId && clientId)
     ? `${baseUrl}/book/${businessId}?ref=${clientId}`
     : '';
   

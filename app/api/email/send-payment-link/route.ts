@@ -100,10 +100,14 @@ export async function POST(request: NextRequest) {
     let finalHtml = generatePaymentLinkEmail(paymentData, businessSettings);
     console.log('📧 Payment Email HTML Preview (first 600 chars):', finalHtml.slice(0, 600));
 
-    // Ensure referral link exists; if template missed it, append a minimal block as fallback
+    // Respect referral toggle from businessSettings
+    const referralEnabled = (businessSettings as any)?.loyaltyProgram?.settings?.referral?.enabled ??
+                            (businessSettings as any)?.loyaltyProgram?.settings?.referralEnabled ?? true;
+
+    // Ensure referral link exists only if enabled; if template missed it, append a minimal block as fallback
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://zentrabooking.com';
     const hasReferral = finalHtml.includes('/book/') && finalHtml.includes('?ref=');
-    if (!hasReferral && typeof businessId === 'string' && typeof clientId === 'string' && businessId && clientId) {
+    if (referralEnabled && !hasReferral && typeof businessId === 'string' && typeof clientId === 'string' && businessId && clientId) {
       const fallbackReferral = `
         <div style="margin:25px 0;padding:20px;background:rgba(255,255,255,0.1);border-radius:8px;border:1px solid rgba(255,255,255,0.2);text-align:center">
           <h3 style="color:#8b3e6b;font-size:16px;margin:0 0 12px 0;font-weight:600">💝 Refer a Friend & Earn Rewards!</h3>
@@ -120,7 +124,7 @@ export async function POST(request: NextRequest) {
       }
       console.log('🔁 Referral fallback appended:', `${baseUrl}/book/${businessId}?ref=${clientId}`);
     } else {
-      console.log('🔗 Referral present in template:', hasReferral);
+      console.log('🔗 Referral present or disabled:', hasReferral, 'enabled:', referralEnabled);
     }
 
     // Send email using Resend
