@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { awardLoyaltyPoints } from '@/lib/loyalty';
+// import { awardLoyaltyPoints } from '@/lib/loyalty';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-09-30.clover',
@@ -128,19 +128,7 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
 
           await updateDoc(appointmentRef, updateData);
 
-          // Award loyalty points if applicable
-          if (appointmentData.clientId && appointmentData.clientEmail) {
-            try {
-              await awardLoyaltyPoints(
-                businessId,
-                appointmentData.clientId,
-                appointmentData.clientEmail,
-                amount
-              );
-            } catch (loyaltyError) {
-              console.error('Failed to award loyalty points:', loyaltyError);
-            }
-          }
+          // Do NOT award loyalty points on payment. Points are awarded when appointment is marked 'completed'.
 
           // Update client's totalSpent
           if (appointmentData.clientId) {

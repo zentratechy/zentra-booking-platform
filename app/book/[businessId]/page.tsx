@@ -1104,15 +1104,7 @@ export default function BookingPage() {
           });
         }
         
-        // Only award new points if customer is NOT using points/rewards AND payment is successful
-        if (!isUsingPoints && (appointmentData.payment?.status === 'paid' || appointmentData.payment?.status === 'partial')) {
-          await awardLoyaltyPoints(
-            businessId,
-            clientId,
-            clientInfo.email,
-            totalPrice
-          );
-        }
+        // Do not award points at booking time. Points are awarded when appointment is marked as Completed.
       } catch (loyaltyError) {
         console.error('❌ Failed to handle loyalty points:', loyaltyError);
         // Don't fail the booking if loyalty points fail
