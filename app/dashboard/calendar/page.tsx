@@ -678,7 +678,10 @@ function CalendarContent() {
         const isUsingPoints = usedPoints > 0 || usedReward;
         
         // Only award points if customer did NOT use points/rewards
-        if (!isUsingPoints) {
+        // and if points weren't already awarded via online payment/webhook
+        const paidViaLink = (selectedAppointment as any)?.payment?.paidViaLink === true;
+        const loyaltyAlreadyAwarded = (selectedAppointment as any)?.loyaltyAwarded === true || (selectedAppointment as any)?.payment?.loyaltyAwarded === true;
+        if (!isUsingPoints && !paidViaLink && !loyaltyAlreadyAwarded) {
           
           // Award loyalty points
           const pointsAwarded = await awardLoyaltyPoints(
@@ -701,6 +704,14 @@ function CalendarContent() {
                 ? { ...c, loyaltyPoints: (c.loyaltyPoints || 0) + pointsToAward } 
                 : c
             ));
+
+            // Mark appointment so we don't award again
+            try {
+              await updateDoc(doc(db, 'appointments', (selectedAppointment as any).id), {
+                loyaltyAwarded: true,
+                'payment.loyaltyAwarded': true,
+              });
+            } catch {}
           }
 
           // Award referral bonus points if this was a referral
