@@ -74,13 +74,8 @@ export async function POST(request: NextRequest) {
           </div>
     ` : '';
 
-    // Send email using Resend
-    const { data, error } = await resend.emails.send({
-      from: `${businessName} <noreply@mail.zentrabooking.com>`,
-      replyTo: businessEmail,
-      to: [clientEmail],
-      subject: `Payment Link - ${serviceName}`,
-      html: `
+    // Build final HTML and log a short preview for debugging
+    const finalHtml = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #d4a574, #b88f61); padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 30px;">
             <h1 style="color: white; margin: 0; font-size: 28px;">Payment Link</h1>
@@ -117,7 +112,22 @@ export async function POST(request: NextRequest) {
             <p>© 2025 ${businessName}. All rights reserved.</p>
           </div>
         </div>
-      `,
+      `;
+
+    console.log('📧 Payment Email HTML Preview (first 600 chars):', finalHtml.slice(0, 600));
+    if (canShowReferral) {
+      console.log('🔗 Referral URL included:', `${baseUrl}/book/${businessId}?ref=${clientId}`);
+    } else {
+      console.log('⚠️ Referral URL not included. businessId:', businessId, 'clientId:', clientId);
+    }
+
+    // Send email using Resend
+    const { data, error } = await resend.emails.send({
+      from: `${businessName} <noreply@mail.zentrabooking.com>`,
+      replyTo: businessEmail,
+      to: [clientEmail],
+      subject: `Payment Link - ${serviceName}`,
+      html: finalHtml,
     });
 
     if (error) {
