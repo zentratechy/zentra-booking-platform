@@ -139,6 +139,13 @@ export async function POST(request: NextRequest) {
       finalHtml += marker;
     }
 
+    // Final safety: strip any stray 'undefined' placeholders or empty blocks
+    finalHtml = finalHtml
+      // remove any divs that only contain 'undefined'
+      .replace(/<div[^>]*>\s*undefined\s*<\/div>/gi, '')
+      // remove bare text nodes 'undefined' surrounded by whitespace
+      .replace(/>\s*undefined\s*</gi, '><');
+
     // Send email using Resend
     const { data, error } = await resend.emails.send({
       from: `${businessName} <noreply@mail.zentrabooking.com>`,
