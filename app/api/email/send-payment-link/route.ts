@@ -78,6 +78,7 @@ export async function POST(request: NextRequest) {
           businessSettings.businessEmail = b.email;
           businessSettings.businessAddress = b.address;
           businessSettings.colorScheme = b.colorScheme || 'classic';
+          businessSettings.loyaltyProgram = b.loyaltyProgram;
         }
       }
     } catch (e) {
@@ -95,10 +96,12 @@ export async function POST(request: NextRequest) {
       businessName,
       businessId,
       serviceName,
+      templateHint: 'payment',
     };
 
     let finalHtml = generatePaymentLinkEmail(paymentData, businessSettings);
     console.log('📧 Payment Email HTML Preview (first 600 chars):', finalHtml.slice(0, 600));
+    console.log('🔧 Loyalty settings:', JSON.stringify(((businessSettings as any)?.loyaltyProgram?.settings) || {}, null, 2));
 
     // Respect referral toggle from businessSettings
     const referralEnabled = (businessSettings as any)?.loyaltyProgram?.settings?.referral?.enabled ??
@@ -107,6 +110,7 @@ export async function POST(request: NextRequest) {
     // Ensure referral link exists only if enabled; if template missed it, append a minimal block as fallback
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://zentrabooking.com';
     const hasReferral = finalHtml.includes('/book/') && finalHtml.includes('?ref=');
+    console.log('🔧 Referral toggle resolved:', referralEnabled, 'hasReferralInTemplate:', hasReferral);
     if (referralEnabled && !hasReferral && typeof businessId === 'string' && typeof clientId === 'string' && businessId && clientId) {
       const fallbackReferral = `
         <div style="margin:25px 0;padding:20px;background:rgba(255,255,255,0.1);border-radius:8px;border:1px solid rgba(255,255,255,0.2);text-align:center">
@@ -125,6 +129,14 @@ export async function POST(request: NextRequest) {
       console.log('🔁 Referral fallback appended:', `${baseUrl}/book/${businessId}?ref=${clientId}`);
     } else {
       console.log('🔗 Referral present or disabled:', hasReferral, 'enabled:', referralEnabled);
+    }
+
+    // Append debug marker comment near footer for quick inspection
+    const marker = `<!-- referral: ${referralEnabled ? 'enabled' : 'disabled'}; source: payment-route; hasUrl:${finalHtml.includes('/book/') && finalHtml.includes('?ref=')} -->`;
+    if (finalHtml.includes('</body>')) {
+      finalHtml = finalHtml.replace('</body>', `${marker}</body>`);
+    } else {
+      finalHtml += marker;
     }
 
     // Send email using Resend
