@@ -704,7 +704,23 @@ function CalendarContent() {
           }
 
           // Award referral bonus points if this was a referral
-          const referralClientId = (selectedAppointment as any)?.referredBy;
+          // Try multiple sources for referrer ID to be robust
+          let referralClientId: string | null = (selectedAppointment as any)?.referredBy || null;
+          if (!referralClientId) {
+            // Some older appointments may not carry referredBy; try client record
+            referralClientId = (selectedClient as any)?.referredBy || null;
+          }
+          if (!referralClientId && formData.clientId) {
+            try {
+              const clientDocSnap = await getDoc(doc(db, 'clients', formData.clientId));
+              if (clientDocSnap.exists()) {
+                referralClientId = (clientDocSnap.data() as any)?.referredBy || null;
+              }
+            } catch (e) {
+              console.warn('Failed to fetch client for referral info:', e);
+            }
+          }
+
           if (referralClientId && formData.clientId) {
             // Only award referral points if this is their first completed appointment
             // Check BEFORE updating to completed status, so we only count previous completions
