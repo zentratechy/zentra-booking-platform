@@ -15,7 +15,8 @@ export async function POST(request: NextRequest) {
       amount, 
       serviceName, 
       paymentLink, 
-      businessId 
+      businessId: bodyBusinessId, 
+      clientId: bodyClientId
     } = body;
 
     // Validate required fields
@@ -30,6 +31,9 @@ export async function POST(request: NextRequest) {
     let businessName = 'Your Business';
     let businessEmail = 'noreply@mail.zentrabooking.com';
     
+    let businessId = bodyBusinessId as string | undefined;
+    let clientId = bodyClientId as string | undefined;
+
     if (businessId) {
       try {
         const businessDoc = await getDoc(doc(db, 'businesses', businessId));
@@ -43,6 +47,32 @@ export async function POST(request: NextRequest) {
         // Continue with defaults
       }
     }
+
+    // If appointmentId is provided, fetch appointment to derive missing ids
+    try {
+      if (appointmentId && (!businessId || !clientId)) {
+        const aptSnap = await getDoc(doc(db, 'appointments', appointmentId));
+        if (aptSnap.exists()) {
+          const aptData = aptSnap.data() as any;
+          if (!businessId && aptData.businessId) businessId = aptData.businessId;
+          if (!clientId && aptData.clientId) clientId = aptData.clientId;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch appointment for referral info:', e);
+    }
+
+    // Build referral section (only if we have both ids as strings)
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://zentrabooking.com';
+    const canShowReferral = typeof businessId === 'string' && typeof clientId === 'string' && businessId && clientId;
+    const referralSection = canShowReferral ? `
+          <div style="background: linear-gradient(135deg, #f9c2d1, #f3a6c0); padding: 24px; border-radius: 12px; text-align: center; margin-top: 28px; border: 1px solid rgba(0,0,0,0.05);">
+            <h3 style="margin: 0 0 12px 0; color: #8b3e6b; font-size: 18px;">💝 Refer a Friend & Earn Rewards!</h3>
+            <p style="margin: 0 0 16px 0; color: #5a3b4a; font-size: 14px;">Love our service? Share your link — you’ll both earn bonus loyalty points when they book.</p>
+            <a href="${baseUrl}/book/${businessId}?ref=${clientId}" style="display:inline-block;background:#8b3e6b;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:600;">📱 Share Booking Link</a>
+            <p style="margin: 12px 0 0 0; color: #6b5160; font-size: 12px;">Copy and share this link to earn referral rewards.</p>
+          </div>
+    ` : '';
 
     // Send email using Resend
     const { data, error } = await resend.emails.send({
@@ -80,6 +110,8 @@ export async function POST(request: NextRequest) {
             </p>
           </div>
           
+          ${referralSection}
+
           <div style="text-align: center; color: #666; font-size: 12px;">
             <p>If you have any questions, please contact ${businessName}.</p>
             <p>© 2025 ${businessName}. All rights reserved.</p>
