@@ -87,7 +87,8 @@ export async function POST(request: NextRequest) {
     // Build HTML using shared template (includes logo/header) and our referral logic in lib templates
     const paymentData: any = {
       customerName: clientName,
-      clientId,
+      // Do not pass clientId into the shared template so its internal referral block is suppressed
+      clientId: undefined,
       amount,
       currency: 'gbp',
       paymentLink,
