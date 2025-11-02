@@ -1637,21 +1637,112 @@ function SettingsContent() {
                   </div>
 
                   {businessData?.clientReminders?.enabled && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Send Reminder (Days Before)</label>
-                      <select
-                        value={businessData?.clientReminders?.daysBefore || 1}
-                        onChange={(e) => handleUpdate('clientReminders', {
-                          ...businessData?.clientReminders,
-                          daysBefore: parseInt(e.target.value),
-                        })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Send Reminder (Days Before)</label>
+                        <select
+                          value={businessData?.clientReminders?.daysBefore || 1}
+                          onChange={(e) => handleUpdate('clientReminders', {
+                            ...businessData?.clientReminders,
+                            daysBefore: parseInt(e.target.value),
+                          })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                        >
+                          <option value={1}>1 day before</option>
+                          <option value={2}>2 days before</option>
+                          <option value={3}>3 days before</option>
+                          <option value={7}>1 week before</option>
+                        </select>
+                      </div>
+                      
+                      <button
+                        onClick={async (e) => {
+                          console.log('🔘 Button clicked!');
+                          console.log('👤 User:', user?.uid);
+                          
+                          if (!user?.uid) {
+                            console.error('❌ No user found');
+                            showToast('User not found', 'error');
+                            return;
+                          }
+                          
+                          const button = e.currentTarget as HTMLButtonElement;
+                          const originalText = button.textContent || 'Send Test Reminder Now';
+                          button.disabled = true;
+                          button.textContent = 'Sending...';
+                          
+                          console.log('📤 Sending request to /api/test/send-client-reminders with businessId:', user.uid);
+                          
+                          try {
+                            const response = await fetch('/api/test/send-client-reminders', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ businessId: user.uid }),
+                            });
+                            
+                            console.log('📥 Response status:', response.status);
+                            
+                            let data;
+                            const contentType = response.headers.get('content-type');
+                            if (contentType && contentType.includes('application/json')) {
+                              try {
+                                data = await response.json();
+                              } catch (jsonError) {
+                                console.error('Failed to parse JSON response:', jsonError);
+                                showToast('Invalid JSON response from server', 'error');
+                                button.disabled = false;
+                                button.textContent = originalText;
+                                return;
+                              }
+                            } else {
+                              const text = await response.text();
+                              console.error('Non-JSON response:', text);
+                              showToast('Invalid response format from server', 'error');
+                              button.disabled = false;
+                              button.textContent = originalText;
+                              return;
+                            }
+                            
+                            if (response.ok) {
+                              console.log('✅ API Response:', data);
+                              console.log('📊 Debug info:', data.debug);
+                              console.log('📋 Results:', data.results);
+                              
+                              // Show more detailed message
+                              if (data.appointments > 0) {
+                                if (data.emailsSent > 0) {
+                                  showToast(`✅ Sent ${data.emailsSent} of ${data.appointments} reminder(s)`, 'success');
+                                } else {
+                                  const errors = data.results?.filter((r: any) => !r.success) || [];
+                                  if (errors.length > 0) {
+                                    console.error('❌ Email sending errors:', errors);
+                                    showToast(`⚠️ Found ${data.appointments} appointment(s) but ${errors.length} error(s) sending emails. Check console.`, 'error');
+                                  } else {
+                                    showToast(`Found ${data.appointments} appointment(s) on ${data.date}`, 'success');
+                                  }
+                                }
+                              } else {
+                                showToast(data.message || `No appointments found for ${data.date}`, 'info');
+                              }
+                            } else {
+                              showToast(data.error || `Failed to send test reminders: ${response.status}`, 'error');
+                              console.error('API Error:', data);
+                            }
+                          } catch (error: any) {
+                            console.error('Error sending test reminders:', error);
+                            showToast(error.message || 'Failed to send test reminders', 'error');
+                          } finally {
+                            button.disabled = false;
+                            button.textContent = originalText;
+                          }
+                        }}
+                        className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <option value={1}>1 day before</option>
-                        <option value={2}>2 days before</option>
-                        <option value={3}>3 days before</option>
-                        <option value={7}>1 week before</option>
-                      </select>
+                        Send Test Reminder Now
+                      </button>
+                      <p className="text-xs text-gray-500">
+                        This will send reminders to clients with appointments in {businessData?.clientReminders?.daysBefore || 1} day{businessData?.clientReminders?.daysBefore !== 1 ? 's' : ''}.
+                      </p>
                     </div>
                   )}
                 </div>
