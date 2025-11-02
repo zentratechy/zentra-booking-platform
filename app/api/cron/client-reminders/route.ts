@@ -98,8 +98,9 @@ export async function GET(request: Request) {
 
         // Send reminder email for each appointment
         for (const appointment of targetAppointments) {
+          const apt = appointment as any;
+          const appointmentId = apt.id;
           try {
-            const apt = appointment as any;
             const clientEmail = apt.clientEmail;
             
             if (!clientEmail) {
@@ -243,7 +244,7 @@ export async function GET(request: Request) {
             totalEmailsSent++;
 
           } catch (aptError: any) {
-            console.error(`❌ Error processing appointment ${apt.id}:`, aptError);
+            console.error(`❌ Error processing appointment ${appointmentId}:`, aptError);
             continue;
           }
         }
