@@ -32,9 +32,17 @@ export async function GET(request: Request) {
     const businessesQuery = query(collection(db, 'businesses'));
     const businessesSnapshot = await getDocs(businessesQuery);
     
+    console.log(`📊 Total businesses found: ${businessesSnapshot.docs.length}`);
+    
     const businesses = businessesSnapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
-      .filter((business: any) => business.clientReminders?.enabled);
+      .filter((business: any) => {
+        const enabled = business.clientReminders?.enabled;
+        if (!enabled) {
+          console.log(`   ⚠️ Business ${business.id} (${business.businessName || business.name}): clientReminders.enabled = ${enabled}`);
+        }
+        return enabled;
+      });
 
     console.log(`📊 Found ${businesses.length} businesses with client reminders enabled`);
 
@@ -47,14 +55,14 @@ export async function GET(request: Request) {
         const daysBefore = businessData.clientReminders?.daysBefore || 1;
 
         // Calculate target date (appointments happening in X days)
+        const today = new Date();
         const targetDate = new Date();
         targetDate.setDate(targetDate.getDate() + daysBefore);
         targetDate.setHours(0, 0, 0, 0);
 
-        const dayAfterTarget = new Date(targetDate);
-        dayAfterTarget.setDate(dayAfterTarget.getDate() + 1);
-
-        console.log(`📅 Looking for appointments on ${targetDate.toISOString().split('T')[0]} (${daysBefore} day${daysBefore !== 1 ? 's' : ''} from now)`);
+        console.log(`📅 Today: ${today.toISOString().split('T')[0]}`);
+        console.log(`📅 Target date: ${targetDate.toISOString().split('T')[0]} (${daysBefore} day${daysBefore !== 1 ? 's' : ''} from now)`);
+        console.log(`📅 Business: ${businessData.businessName || businessData.name} (${business.id})`);
 
         // Fetch appointments for this business
         const appointmentsQuery = query(
@@ -63,20 +71,79 @@ export async function GET(request: Request) {
         );
         const appointmentsSnapshot = await getDocs(appointmentsQuery);
         
-        // Filter for target date appointments that haven't been cancelled and haven't received a reminder
-        const targetAppointments = appointmentsSnapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter((apt: any) => {
-            const aptDate = apt.date?.toDate ? apt.date.toDate() : new Date(apt.date);
-            aptDate.setHours(0, 0, 0, 0);
+        console.log(`📋 Found ${appointmentsSnapshot.docs.length} total appointments for this business`);
+        
+        // Debug: log all appointments to see what we're working with
+        const allAppointments = appointmentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const targetDateKey = targetDate.toISOString().split('T')[0];
+        
+        console.log(`🔍 Debugging appointments for target date: ${targetDateKey}`);
+        allAppointments.forEach((apt: any) => {
+          try {
+            let aptDate: Date;
+            if (apt.date?.toDate && typeof apt.date.toDate === 'function') {
+              aptDate = apt.date.toDate();
+            } else if (apt.date) {
+              aptDate = new Date(apt.date);
+            } else {
+              return;
+            }
             
-            // Only process confirmed/pending appointments that haven't been cancelled
-            // and haven't already received a reminder
-            return aptDate.getTime() === targetDate.getTime() && 
-                   apt.status !== 'cancelled' &&
-                   apt.status !== 'completed' &&
-                   !apt.reminderSent && // Check if reminder already sent
-                   apt.clientEmail; // Must have client email
+            if (isNaN(aptDate.getTime())) {
+              return;
+            }
+            
+            aptDate.setHours(0, 0, 0, 0);
+            const aptDateKey = aptDate.toISOString().split('T')[0];
+            
+            // Only log appointments within 3 days of target
+            const daysDiff = Math.round((aptDate.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24));
+            if (Math.abs(daysDiff) <= 3) {
+              const dateMatch = aptDateKey === targetDateKey;
+              const statusOk = apt.status !== 'cancelled' && apt.status !== 'completed';
+              const noReminder = !apt.reminderSent;
+              const hasEmail = !!apt.clientEmail;
+              const willMatch = dateMatch && statusOk && noReminder && hasEmail;
+              
+              console.log(`   📍 ${apt.id}: ${aptDateKey} (${daysDiff} days), status: ${apt.status}, reminderSent: ${apt.reminderSent}, email: ${hasEmail ? 'yes' : 'no'} ${willMatch ? '✅ MATCH' : '❌'}`);
+              if (!dateMatch) console.log(`      ❌ Date doesn't match`);
+              if (!statusOk) console.log(`      ❌ Status is "${apt.status}"`);
+              if (!noReminder) console.log(`      ❌ Reminder already sent`);
+              if (!hasEmail) console.log(`      ❌ No client email`);
+            }
+          } catch (e) {
+            // Skip
+          }
+        });
+        
+        // Filter for target date appointments that haven't been cancelled and haven't received a reminder
+        const targetAppointments = allAppointments.filter((apt: any) => {
+            try {
+              let aptDate: Date;
+              if (apt.date?.toDate && typeof apt.date.toDate === 'function') {
+                aptDate = apt.date.toDate();
+              } else if (apt.date) {
+                aptDate = new Date(apt.date);
+              } else {
+                return false;
+              }
+              
+              if (isNaN(aptDate.getTime())) {
+                return false;
+              }
+              
+              aptDate.setHours(0, 0, 0, 0);
+              
+              // Only process confirmed/pending appointments that haven't been cancelled
+              // and haven't already received a reminder
+              return aptDate.getTime() === targetDate.getTime() && 
+                     apt.status !== 'cancelled' &&
+                     apt.status !== 'completed' &&
+                     !apt.reminderSent && // Check if reminder already sent
+                     apt.clientEmail; // Must have client email
+            } catch (e) {
+              return false;
+            }
           })
           .sort((a: any, b: any) => {
             // Sort by time
