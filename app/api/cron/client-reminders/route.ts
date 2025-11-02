@@ -11,10 +11,21 @@ export async function GET(request: Request) {
     console.log('🔔 Starting client appointment reminders cron job...');
 
     // Verify the request is from Vercel Cron (optional security check)
-    const authHeader = request.headers.get('authorization');
-    if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      console.log('❌ Unauthorized cron request');
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Allow manual testing via ?test=true query parameter
+    const url = new URL(request.url);
+    const isTestMode = url.searchParams.get('test') === 'true';
+    
+    if (!isTestMode) {
+      const authHeader = request.headers.get('authorization');
+      if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+        console.log('❌ Unauthorized cron request');
+        return NextResponse.json({ 
+          error: 'Unauthorized',
+          message: 'This endpoint requires authorization. Add ?test=true for manual testing or use the test endpoint at /api/test/send-client-reminders'
+        }, { status: 401 });
+      }
+    } else {
+      console.log('🧪 Manual test mode enabled via ?test=true');
     }
 
     // Get all businesses with client reminders enabled
