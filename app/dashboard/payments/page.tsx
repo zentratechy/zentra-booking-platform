@@ -58,7 +58,7 @@ function PaymentsContent() {
   const router = useRouter();
   const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedFilter, setSelectedFilter] = useState<'all' | 'paid' | 'pending' | 'partial'>('all');
+  const [selectedFilter, setSelectedFilter] = useState<'all' | 'paid' | 'pending' | 'partial' | 'cancelled'>('all');
   const [currency, setCurrency] = useState('usd');
   const [businessData, setBusinessData] = useState<any>(null);
   const [selectedPayment, setSelectedPayment] = useState<any>(null);
@@ -75,6 +75,38 @@ function PaymentsContent() {
     notes: '',
     voucherCode: '',
   });
+
+  // Update payment amount when modal opens with selected payment
+  useEffect(() => {
+    if (showPaymentModal && selectedPayment) {
+      // Calculate total price (service + products)
+      const servicePrice = selectedPayment.servicePrice !== undefined 
+        ? selectedPayment.servicePrice 
+        : (selectedPayment.price || 0) - (selectedPayment.productsPrice || 0);
+      const productsPrice = selectedPayment.productsPrice !== undefined
+        ? selectedPayment.productsPrice
+        : (selectedPayment.products || []).reduce((total: number, p: any) => 
+            total + (p.total || (p.price || 0) * (p.quantity || 1)), 
+          0);
+      const totalPrice = selectedPayment.price || (servicePrice + productsPrice);
+      const amountPaid = selectedPayment.payment?.amount || 0;
+      const calculatedRemainingBalance = totalPrice - amountPaid;
+      const remainingBalance = calculatedRemainingBalance > 0 ? calculatedRemainingBalance : 0;
+      
+      setPaymentData(prev => ({
+        ...prev,
+        amount: remainingBalance
+      }));
+    } else if (!showPaymentModal) {
+      // Reset payment data when modal closes
+      setPaymentData({
+        method: 'cash',
+        amount: 0,
+        notes: '',
+        voucherCode: '',
+      });
+    }
+  }, [showPaymentModal, selectedPayment]);
 
   useEffect(() => {
     if (!user) return;
@@ -326,7 +358,9 @@ function PaymentsContent() {
   // Filter appointments by payment status
   const filteredAppointments = appointments.filter(apt => {
     if (selectedFilter === 'all') return true;
-    return apt.payment?.status === selectedFilter;
+    if (selectedFilter === 'cancelled') return apt.status === 'cancelled';
+    if (selectedFilter === 'pending') return apt.payment?.status === 'pending' && apt.status !== 'cancelled';
+    return apt.payment?.status === selectedFilter && apt.status !== 'cancelled';
   });
 
   // Calculate stats
@@ -340,11 +374,15 @@ function PaymentsContent() {
   }, 0);
   
   const totalPotentialRevenue = appointments.reduce((sum, apt) => sum + (apt.price || 0), 0);
-  const paidAppointments = appointments.filter(apt => apt.payment?.status === 'paid');
-  const pendingPayments = appointments.filter(apt => apt.payment?.status === 'pending');
-  const depositsPaid = appointments.filter(apt => apt.payment?.status === 'partial');
+  const paidAppointments = appointments.filter(apt => apt.payment?.status === 'paid' && apt.status !== 'cancelled');
+  const pendingPayments = appointments.filter(apt => apt.payment?.status === 'pending' && apt.status !== 'cancelled');
+  const depositsPaid = appointments.filter(apt => apt.payment?.status === 'partial' && apt.status !== 'cancelled');
   
   const outstandingBalance = appointments.reduce((sum, apt) => {
+    // Exclude cancelled appointments from outstanding balance
+    if (apt.status === 'cancelled') {
+      return sum;
+    }
     if (apt.payment?.status === 'partial') {
       return sum + (apt.payment?.remainingBalance || 0);
     } else if (apt.payment?.status === 'pending') {
@@ -358,17 +396,17 @@ function PaymentsContent() {
       <DashboardSidebar />
 
       {/* Main Content */}
-      <div className="ml-64 min-h-screen">
+      <div className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
         {/* Top Bar */}
         <div className="bg-white shadow-sm sticky top-0 z-30">
-          <div className="px-8 py-4">
+          <div className="px-4 sm:px-6 lg:px-8 py-4">
             <h2 className="text-2xl font-bold text-gray-900">Payments</h2>
             <p className="text-gray-600">Track payments and transaction history</p>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-8">
+        <div className="p-4 sm:p-6 lg:p-8">
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
@@ -437,6 +475,12 @@ function PaymentsContent() {
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedFilter === 'pending' ? 'bg-yellow-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
               >
                 Pending
+              </button>
+              <button
+                onClick={() => setSelectedFilter('cancelled')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedFilter === 'cancelled' ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+              >
+                Cancelled
               </button>
             </div>
           </div>
@@ -576,7 +620,20 @@ function PaymentsContent() {
                                   }
                                   
                                   setSelectedPayment(appointmentWithEmail);
-                                  const remainingBalance = apt.payment?.remainingBalance || apt.price;
+                                  // Calculate total price (service + products)
+                                  const servicePrice = apt.servicePrice !== undefined 
+                                    ? apt.servicePrice 
+                                    : (apt.price || 0) - (apt.productsPrice || 0);
+                                  const productsPrice = apt.productsPrice !== undefined
+                                    ? apt.productsPrice
+                                    : (apt.products || []).reduce((total: number, p: any) => 
+                                        total + (p.total || (p.price || 0) * (p.quantity || 1)), 
+                                      0);
+                                  const totalPrice = apt.price || (servicePrice + productsPrice);
+                                  const amountPaid = apt.payment?.amount || 0;
+                                  const calculatedRemainingBalance = totalPrice - amountPaid;
+                                  const remainingBalance = calculatedRemainingBalance > 0 ? calculatedRemainingBalance : 0;
+                                  
                                   setPaymentData({
                                     method: 'cash',
                                     amount: remainingBalance,
@@ -670,30 +727,108 @@ function PaymentsContent() {
                 <div className="bg-blue-50 rounded-xl p-4">
                   <h4 className="font-semibold text-gray-900 mb-3">Payment Information</h4>
                   <div className="space-y-3 text-sm">
+                    {/* Service Price */}
                     <div className="flex justify-between">
                       <span className="text-gray-600">Service Price:</span>
-                      <span className="font-medium text-gray-900">{formatPrice(selectedPayment.price, currency)}</span>
+                      <span className="font-medium text-gray-900">
+                        {formatPrice(
+                          selectedPayment.servicePrice !== undefined 
+                            ? selectedPayment.servicePrice 
+                            : (selectedPayment.price || 0) - (selectedPayment.productsPrice || 0),
+                          currency
+                        )}
+                      </span>
                     </div>
-                    <div className="flex justify-between">
+                    
+                    {/* Products Price */}
+                    {(selectedPayment.productsPrice > 0 || (selectedPayment.products && selectedPayment.products.length > 0)) && (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Products:</span>
+                          <span className="font-medium text-gray-900">
+                            {formatPrice(
+                              selectedPayment.productsPrice !== undefined
+                                ? selectedPayment.productsPrice
+                                : (selectedPayment.products || []).reduce((total: number, p: any) => 
+                                    total + (p.total || (p.price || 0) * (p.quantity || 1)), 
+                                  0),
+                              currency
+                            )}
+                          </span>
+                        </div>
+                        {selectedPayment.products && selectedPayment.products.length > 0 && (
+                          <div className="ml-4 pl-4 border-l-2 border-blue-200 space-y-1 text-xs">
+                            {selectedPayment.products.map((p: any, idx: number) => (
+                              <div key={idx} className="flex justify-between">
+                                <span className="text-gray-500">
+                                  {p.name || p.productName} x{p.quantity || 1}
+                                </span>
+                                <span className="text-gray-700">
+                                  {formatPrice(p.total || (p.price || 0) * (p.quantity || 1), currency)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                    
+                    {/* Total Price */}
+                    <div className="flex justify-between pt-2 border-t border-blue-200">
+                      <span className="font-semibold text-gray-900">Total Price:</span>
+                      <span className="font-bold text-lg text-gray-900">
+                        {formatPrice(selectedPayment.price || 0, currency)}
+                      </span>
+                    </div>
+                    
+                    {/* Amount Paid */}
+                    <div className="flex justify-between pt-2 border-t border-blue-200">
                       <span className="text-gray-600">Amount Paid:</span>
                       <span className="font-semibold text-green-600">
                         {formatPrice(selectedPayment.payment?.amount || 0, currency)}
                       </span>
                     </div>
-                    {selectedPayment.payment?.remainingBalance > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Remaining Balance:</span>
-                        <span className="font-semibold text-red-600">
-                          {formatPrice(selectedPayment.payment?.remainingBalance || 0, currency)}
-                        </span>
-                      </div>
-                    )}
+                    
+                    {/* Remaining Balance */}
+                    {(() => {
+                      // Calculate total price (service + products)
+                      const servicePrice = selectedPayment.servicePrice !== undefined 
+                        ? selectedPayment.servicePrice 
+                        : (selectedPayment.price || 0) - (selectedPayment.productsPrice || 0);
+                      const productsPrice = selectedPayment.productsPrice !== undefined
+                        ? selectedPayment.productsPrice
+                        : (selectedPayment.products || []).reduce((total: number, p: any) => 
+                            total + (p.total || (p.price || 0) * (p.quantity || 1)), 
+                          0);
+                      const totalPrice = selectedPayment.price || (servicePrice + productsPrice);
+                      const amountPaid = selectedPayment.payment?.amount || 0;
+                      const calculatedRemainingBalance = totalPrice - amountPaid;
+                      
+                      // Use calculated balance if it's different from stored (to handle products added later)
+                      const remainingBalance = calculatedRemainingBalance > 0 ? calculatedRemainingBalance : 0;
+                      
+                      if (remainingBalance > 0) {
+                        return (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Remaining Balance:</span>
+                            <span className="font-semibold text-red-600">
+                              {formatPrice(remainingBalance, currency)}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                    
+                    {/* Payment Method */}
                     <div className="flex justify-between pt-2 border-t border-blue-200">
                       <span className="text-gray-600">Payment Method:</span>
                       <span className="font-medium text-gray-900 capitalize">
                         {selectedPayment.payment?.method || 'N/A'}
                       </span>
                     </div>
+                    
+                    {/* Payment Status */}
                     <div className="flex justify-between">
                       <span className="text-gray-600">Payment Status:</span>
                       <span className={`font-semibold capitalize ${
@@ -951,8 +1086,8 @@ function PaymentsContent() {
       {/* Payment Modal */}
       {showPaymentModal && selectedPayment && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full">
-            <div className="p-6">
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] flex flex-col">
+            <div className="p-6 overflow-y-auto flex-1">
               <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 mx-auto mb-4">
                 <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -964,19 +1099,38 @@ function PaymentsContent() {
                 Payment for <span className="font-semibold">{selectedPayment.clientName}</span>
               </p>
               
-              {selectedPayment.payment?.remainingBalance > 0 && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <div className="text-sm">
-                      <div className="font-medium text-yellow-800">Remaining Balance Due</div>
-                      <div className="text-yellow-700">{formatPrice(selectedPayment.payment?.remainingBalance || 0, currency)}</div>
+              {(() => {
+                // Calculate total price (service + products)
+                const servicePrice = selectedPayment.servicePrice !== undefined 
+                  ? selectedPayment.servicePrice 
+                  : (selectedPayment.price || 0) - (selectedPayment.productsPrice || 0);
+                const productsPrice = selectedPayment.productsPrice !== undefined
+                  ? selectedPayment.productsPrice
+                  : (selectedPayment.products || []).reduce((total: number, p: any) => 
+                      total + (p.total || (p.price || 0) * (p.quantity || 1)), 
+                    0);
+                const totalPrice = selectedPayment.price || (servicePrice + productsPrice);
+                const amountPaid = selectedPayment.payment?.amount || 0;
+                const calculatedRemainingBalance = totalPrice - amountPaid;
+                const remainingBalance = calculatedRemainingBalance > 0 ? calculatedRemainingBalance : 0;
+                
+                if (remainingBalance > 0) {
+                  return (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                      <div className="flex items-center">
+                        <svg className="w-5 h-5 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <div className="text-sm">
+                          <div className="font-medium text-yellow-800">Remaining Balance Due</div>
+                          <div className="text-yellow-700">{formatPrice(remainingBalance, currency)}</div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              )}
+                  );
+                }
+                return null;
+              })()}
 
               {/* Send Payment Link Option */}
               <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-300 rounded-lg p-4 mb-4">
@@ -998,7 +1152,19 @@ function PaymentsContent() {
                         try {
                           const paymentLink = `${window.location.origin}/pay/${selectedPayment.id}`;
                           
-                          const amountToPay = selectedPayment.payment?.remainingBalance || selectedPayment.price || 0;
+                          // Calculate total price (service + products)
+                          const servicePrice = selectedPayment.servicePrice !== undefined 
+                            ? selectedPayment.servicePrice 
+                            : (selectedPayment.price || 0) - (selectedPayment.productsPrice || 0);
+                          const productsPrice = selectedPayment.productsPrice !== undefined
+                            ? selectedPayment.productsPrice
+                            : (selectedPayment.products || []).reduce((total: number, p: any) => 
+                                total + (p.total || (p.price || 0) * (p.quantity || 1)), 
+                              0);
+                          const totalPrice = selectedPayment.price || (servicePrice + productsPrice);
+                          const amountPaid = selectedPayment.payment?.amount || 0;
+                          const calculatedRemainingBalance = totalPrice - amountPaid;
+                          const amountToPay = calculatedRemainingBalance > 0 ? calculatedRemainingBalance : totalPrice;
                           
                           const payload = {
                             to: selectedPayment.clientEmail,
@@ -1080,9 +1246,72 @@ function PaymentsContent() {
                   </div>
                 )}
                 <p className="text-xs text-center text-gray-500 mt-3">
-                  Amount: {formatPrice(selectedPayment.payment?.remainingBalance || selectedPayment.price || 0, currency)} • Or record manual payment below
+                  {(() => {
+                    // Calculate total price (service + products)
+                    const servicePrice = selectedPayment.servicePrice !== undefined 
+                      ? selectedPayment.servicePrice 
+                      : (selectedPayment.price || 0) - (selectedPayment.productsPrice || 0);
+                    const productsPrice = selectedPayment.productsPrice !== undefined
+                      ? selectedPayment.productsPrice
+                      : (selectedPayment.products || []).reduce((total: number, p: any) => 
+                          total + (p.total || (p.price || 0) * (p.quantity || 1)), 
+                        0);
+                    const totalPrice = selectedPayment.price || (servicePrice + productsPrice);
+                    const amountPaid = selectedPayment.payment?.amount || 0;
+                    const calculatedRemainingBalance = totalPrice - amountPaid;
+                    const remainingBalance = calculatedRemainingBalance > 0 ? calculatedRemainingBalance : totalPrice;
+                    
+                    return `Amount: ${formatPrice(remainingBalance, currency)} • Or record manual payment below`;
+                  })()}
                 </p>
               </div>
+
+              {/* Price Breakdown */}
+              {(() => {
+                const servicePrice = selectedPayment.servicePrice !== undefined 
+                  ? selectedPayment.servicePrice 
+                  : (selectedPayment.price || 0) - (selectedPayment.productsPrice || 0);
+                const productsPrice = selectedPayment.productsPrice !== undefined
+                  ? selectedPayment.productsPrice
+                  : (selectedPayment.products || []).reduce((total: number, p: any) => 
+                      total + (p.total || (p.price || 0) * (p.quantity || 1)), 
+                    0);
+                const totalPrice = selectedPayment.price || (servicePrice + productsPrice);
+                
+                return (
+                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                    <div className="text-sm font-semibold text-gray-900 mb-2">Price Breakdown:</div>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Service:</span>
+                        <span className="font-medium text-gray-900">{formatPrice(servicePrice, currency)}</span>
+                      </div>
+                      {productsPrice > 0 && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Products:</span>
+                            <span className="font-medium text-gray-900">{formatPrice(productsPrice, currency)}</span>
+                          </div>
+                          {selectedPayment.products && selectedPayment.products.length > 0 && (
+                            <div className="ml-4 pl-3 border-l-2 border-gray-300 space-y-0.5 text-xs">
+                              {selectedPayment.products.map((p: any, idx: number) => (
+                                <div key={idx} className="flex justify-between text-gray-600">
+                                  <span>{p.name || p.productName} x{p.quantity || 1}</span>
+                                  <span>{formatPrice(p.total || (p.price || 0) * (p.quantity || 1), currency)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )}
+                      <div className="flex justify-between pt-2 border-t border-gray-300 font-bold">
+                        <span className="text-gray-900">Total:</span>
+                        <span className="text-gray-900">{formatPrice(totalPrice, currency)}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="space-y-4">
                 <div>
@@ -1112,17 +1341,47 @@ function PaymentsContent() {
                       className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
                       step="0.01"
                       min="0"
-                      max={selectedPayment.price}
+                      max={(() => {
+                        const servicePrice = selectedPayment.servicePrice !== undefined 
+                          ? selectedPayment.servicePrice 
+                          : (selectedPayment.price || 0) - (selectedPayment.productsPrice || 0);
+                        const productsPrice = selectedPayment.productsPrice !== undefined
+                          ? selectedPayment.productsPrice
+                          : (selectedPayment.products || []).reduce((total: number, p: any) => 
+                              total + (p.total || (p.price || 0) * (p.quantity || 1)), 
+                            0);
+                        return selectedPayment.price || (servicePrice + productsPrice);
+                      })()}
                     />
                   </div>
                   <div className="text-sm text-gray-600 mt-1 space-y-1">
-                    <div>Total due: {formatPrice(selectedPayment.price || 0, currency)}</div>
-                    {selectedPayment.payment?.amount > 0 && (
-                      <div>Already paid: {formatPrice(selectedPayment.payment?.amount || 0, currency)}</div>
-                    )}
-                    {selectedPayment.payment?.remainingBalance > 0 && (
-                      <div className="text-red-600 font-medium">Remaining: {formatPrice(selectedPayment.payment?.remainingBalance || 0, currency)}</div>
-                    )}
+                    {(() => {
+                      // Calculate total price (service + products)
+                      const servicePrice = selectedPayment.servicePrice !== undefined 
+                        ? selectedPayment.servicePrice 
+                        : (selectedPayment.price || 0) - (selectedPayment.productsPrice || 0);
+                      const productsPrice = selectedPayment.productsPrice !== undefined
+                        ? selectedPayment.productsPrice
+                        : (selectedPayment.products || []).reduce((total: number, p: any) => 
+                            total + (p.total || (p.price || 0) * (p.quantity || 1)), 
+                          0);
+                      const totalPrice = selectedPayment.price || (servicePrice + productsPrice);
+                      const amountPaid = selectedPayment.payment?.amount || 0;
+                      const calculatedRemainingBalance = totalPrice - amountPaid;
+                      const remainingBalance = calculatedRemainingBalance > 0 ? calculatedRemainingBalance : 0;
+                      
+                      return (
+                        <>
+                          <div>Total due: {formatPrice(totalPrice, currency)}</div>
+                          {amountPaid > 0 && (
+                            <div>Already paid: {formatPrice(amountPaid, currency)}</div>
+                          )}
+                          {remainingBalance > 0 && (
+                            <div className="text-red-600 font-medium">Remaining: {formatPrice(remainingBalance, currency)}</div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -1138,7 +1397,11 @@ function PaymentsContent() {
                 </div>
               </div>
 
-              <div className="flex space-x-3 mt-6">
+            </div>
+            
+            {/* Fixed Footer with Buttons */}
+            <div className="p-6 border-t border-gray-200 bg-white rounded-b-2xl flex-shrink-0">
+              <div className="flex space-x-3">
                 <button 
                   type="button"
                   onClick={() => {

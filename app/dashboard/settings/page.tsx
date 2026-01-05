@@ -156,17 +156,25 @@ function SettingsContent() {
         'server_error': 'Server error during connection. Please try again in a moment.',
         'storage_error': 'Error saving connection data. Please contact support.',
         'no_account_id': 'Failed to receive account ID from Stripe. Please try connecting again.',
+        'client_id_mismatch': 'The Stripe Client ID and Secret Key do not match. Please ensure they are from the same Stripe account and same mode (test/live). Check your environment variables.',
+        'invalid_request': 'Invalid Stripe request. Please check your Stripe configuration.',
       };
       
-      // Check if it's a known error or show the decoded error
-      const errorMessage = errorMessages[decodedError] || errorMessages[stripeError] || decodedError || stripeError;
-      showToast(`Stripe connection failed: ${errorMessage}`, 'error');
+      // Check if there's a custom error message in the URL
+      const errorMessageParam = urlParams.get('error_message');
+      let finalErrorMessage = errorMessages[decodedError] || errorMessages[stripeError] || decodedError || stripeError;
+      
+      if (errorMessageParam) {
+        finalErrorMessage = decodeURIComponent(errorMessageParam);
+      }
+      
+      showToast(`Stripe connection failed: ${finalErrorMessage}`, 'error');
       
       // Log for debugging
       console.error('Stripe connection error:', {
         rawError: stripeError,
         decodedError: decodedError,
-        message: errorMessage
+        message: finalErrorMessage
       });
       
       // Clean up URL
@@ -610,6 +618,12 @@ function SettingsContent() {
 
 
   const handleConnectStripe = async () => {
+    // Check if Square is already connected
+    if (squareConnected || businessData?.paymentConfig?.square?.accessToken) {
+      showToast('You are already connected to Square. Please disconnect Square first before connecting Stripe.', 'error');
+      return;
+    }
+    
     setConnectingStripe(true);
     try {
       // First, try OAuth if configured (connects existing accounts directly)
@@ -631,15 +645,15 @@ function SettingsContent() {
         return;
       }
 
-      // Fall back to Connect account creation (creates new account)
-      // Validate required data
+      // Fall back to direct account creation (no Client ID needed, but requires Stripe Connect enabled)
+      // This creates a new Stripe account for the business
       if (!user?.email) {
         showToast('User email is required', 'error');
         setConnectingStripe(false);
         return;
       }
 
-      // Create Stripe Connect account (businesses can connect existing or create new during onboarding)
+      // Create Stripe Connect account directly (creates new account for business)
       const response = await fetch('/api/stripe/create-connect-account', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -681,7 +695,7 @@ function SettingsContent() {
         const linkData = await linkResponse.json();
 
         if (linkData.url) {
-          // Redirect to Stripe onboarding (businesses can connect existing or create new account here)
+          // Redirect to Stripe onboarding (businesses complete setup here)
           window.location.href = linkData.url;
         } else {
           setConnectingStripe(false);
@@ -728,23 +742,25 @@ function SettingsContent() {
   };
 
   const handleConnectSquare = async () => {
+    // Check if Stripe is already connected
+    if (stripeConnected || businessData?.paymentConfig?.stripe?.accountId) {
+      showToast('You are already connected to Stripe. Please disconnect Stripe first before connecting Square.', 'error');
+      return;
+    }
+    
     setConnectingSquare(true);
     try {
       const squareAppId = process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID;
-      const isSandbox = squareAppId?.startsWith('sandbox-');
-
-      // Square OAuth requires user to be logged into Square dashboard first
-      // Show helpful message and open Square dashboard in new tab
-      const squareDashboardUrl = isSandbox
-        ? 'https://app.squareupsandbox.com/dashboard/'
-        : 'https://squareup.com/dashboard/';
-
-      // Open Square dashboard in new tab so user can log in if needed
-      window.open(squareDashboardUrl, '_blank');
       
-      // Show toast with instructions
-      showToast('Opening Square dashboard. Please ensure you are logged in, then authorize Zentra.', 'info');
+      // Check if Square is configured
+      if (!squareAppId) {
+        showToast('Square is not configured. Please contact support to set up Square integration.', 'error');
+        setConnectingSquare(false);
+        return;
+      }
       
+      const isSandbox = squareAppId.startsWith('sandbox-');
+
       // Normalize domain - remove www if present for consistency
       let domain = window.location.hostname;
       if (domain.startsWith('www.')) {
@@ -760,13 +776,15 @@ function SettingsContent() {
         : 'https://connect.squareup.com';
 
       // Construct OAuth URL with proper encoding
-      const oauthUrl = `${baseUrl}/oauth2/authorize?client_id=${encodeURIComponent(squareAppId!)}&scope=${scope}&state=${encodeURIComponent(state)}&session=false&redirect_uri=${encodeURIComponent(redirectUri)}`;
+      // Use session=true to allow Square to use existing session if user is logged in
+      const oauthUrl = `${baseUrl}/oauth2/authorize?client_id=${encodeURIComponent(squareAppId)}&scope=${scope}&state=${encodeURIComponent(state)}&session=true&redirect_uri=${encodeURIComponent(redirectUri)}`;
 
       console.log('Square OAuth URL:', oauthUrl);
       console.log('Redirect URI:', redirectUri);
       console.log('Domain (normalized):', domain);
       console.log('Square App ID:', squareAppId);
       console.log('Base URL:', baseUrl);
+      console.log('Is Sandbox:', isSandbox);
       
       // Verify the URL contains 'connect.' before redirecting
       if (!oauthUrl.includes('connect.')) {
@@ -776,10 +794,11 @@ function SettingsContent() {
         return;
       }
       
-      // Wait a moment for the Square dashboard to open, then redirect to OAuth
-      setTimeout(() => {
-        window.location.href = oauthUrl;
-      }, 1000);
+      // Show helpful message before redirecting
+      showToast('Redirecting to Square to authorize Zentra. Please log in if prompted.', 'info');
+      
+      // Redirect directly to OAuth - Square will handle login flow
+      window.location.href = oauthUrl;
     } catch (error: any) {
       console.error('Error connecting Square:', error);
       showToast('Failed to connect Square: ' + error.message, 'error');
@@ -902,7 +921,7 @@ function SettingsContent() {
       <DashboardSidebar />
 
       {/* Main Content */}
-      <div className="ml-64 p-8">
+      <div className="lg:ml-64 p-8">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="mb-8">
@@ -2567,7 +2586,7 @@ function SettingsContent() {
                 <button
                   onClick={() => {
                     setShowLocationLimitModal(false);
-                    router.push('/dashboard/subscription');
+                    router.push('/subscription');
                   }}
                   className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
                 >

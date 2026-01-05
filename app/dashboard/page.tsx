@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
@@ -144,10 +143,10 @@ function DashboardContent() {
       <DashboardSidebar />
 
       {/* Main Content */}
-      <div className="ml-64 min-h-screen">
+      <div className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
         {/* Top Bar */}
         <div className="bg-white shadow-sm sticky top-0 z-30">
-          <div className="px-8 py-4 flex justify-between items-center">
+          <div className="px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
               <p className="text-gray-600">Welcome back! Here's what's happening today.</p>
@@ -174,7 +173,7 @@ function DashboardContent() {
         </div>
 
         {/* Content */}
-        <div className="p-8">
+        <div className="p-4 sm:p-6 lg:p-8">
           {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {stats.map((stat, index) => (
@@ -237,13 +236,6 @@ function DashboardContent() {
                 </svg>
                 Copy
               </button>
-              <Link
-                href={`/book/${user?.uid}`}
-                target="_blank"
-                className="px-4 py-2 bg-white hover:bg-gray-50 border-2 border-primary text-primary rounded-lg font-medium transition-colors"
-              >
-                Preview
-              </Link>
             </div>
           </div>
 

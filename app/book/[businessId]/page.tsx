@@ -145,7 +145,7 @@ export default function BookingPage() {
   // Customer authentication
   const { customer, loading: authLoading, login: customerLogin, logout: customerLogout } = useCustomerAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [loginForm, setLoginForm] = useState({ email: '', phone: '' });
+  const [loginForm, setLoginForm] = useState({ email: '' });
 
   // Pre-fill client info when customer is logged in
   useEffect(() => {
@@ -249,7 +249,7 @@ export default function BookingPage() {
           setSelectedLocation(locationsData[0]);
         }
 
-        // Fetch staff (exclude back-of-house staff)
+        // Fetch staff (exclude back-of-house staff and those without services)
         const staffQuery = query(
           collection(db, 'staff'),
           where('businessId', '==', businessId)
@@ -262,7 +262,9 @@ export default function BookingPage() {
           }))
           .filter((member: any) => 
             !member.isBackOfHouse && // Exclude back-of-house staff
-            (member.status === 'active' || !member.status) // Include active or staff without status field
+            (member.status === 'active' || !member.status) && // Include active or staff without status field
+            member.services && // Must have services assigned
+            member.services.length > 0 // Must have at least one service (can do treatments)
           );
         
         setStaff(staffData);
@@ -440,10 +442,10 @@ export default function BookingPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const success = await customerLogin(loginForm.email, loginForm.phone);
+      const success = await customerLogin(loginForm.email);
       if (success) {
         setShowLoginModal(false);
-        setToast({ message: 'Verification code sent to your phone!', type: 'success' });
+        setToast({ message: 'Verification code sent to your email!', type: 'success' });
         
         // Store current booking state before redirecting
         const bookingState = {
@@ -458,7 +460,7 @@ export default function BookingPage() {
         sessionStorage.setItem('bookingState', JSON.stringify(bookingState));
         
         // Redirect to verification page with businessId
-        window.location.href = `/customer-login?email=${encodeURIComponent(loginForm.email)}&phone=${encodeURIComponent(loginForm.phone)}&businessId=${businessId}`;
+        window.location.href = `/customer-login?email=${encodeURIComponent(loginForm.email)}&businessId=${businessId}`;
       } else {
         setToast({ message: 'Failed to send verification code', type: 'error' });
       }
@@ -481,11 +483,69 @@ export default function BookingPage() {
     }
   };
 
+  // Helper function to ensure a value is a Date object
+  const ensureDate = (value: any): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) {
+      return isNaN(value.getTime()) ? null : value;
+    }
+    if (typeof value === 'string') {
+      const date = new Date(value);
+      return isNaN(date.getTime()) ? null : date;
+    }
+    if (value?.toDate && typeof value.toDate === 'function') {
+      try {
+        const date = value.toDate();
+        return isNaN(date.getTime()) ? null : date;
+      } catch {
+        return null;
+      }
+    }
+    if (value?.seconds && typeof value.seconds === 'number') {
+      try {
+        const date = new Date(value.seconds * 1000);
+        return isNaN(date.getTime()) ? null : date;
+      } catch {
+        return null;
+      }
+    }
+    try {
+      const date = new Date(value);
+      return isNaN(date.getTime()) ? null : date;
+    } catch {
+      return null;
+    }
+  };
+
   // Helper function to check if a date is within booking limits
-  const isDateWithinBookingLimits = (date: Date) => {
+  const isDateWithinBookingLimits = (date: Date | string | null | any) => {
+    if (!date) return false;
+    
+    // Convert to Date object if it's not already
+    let dateObj: Date;
+    if (date instanceof Date) {
+      dateObj = date;
+    } else if (typeof date === 'string') {
+      dateObj = new Date(date);
+    } else if (date?.toDate && typeof date.toDate === 'function') {
+      // Handle Firestore Timestamp
+      dateObj = date.toDate();
+    } else if (date?.seconds && typeof date.seconds === 'number') {
+      // Handle Firestore Timestamp from JSON
+      dateObj = new Date(date.seconds * 1000);
+    } else {
+      // Fallback: try to create Date from value
+      dateObj = new Date(date);
+    }
+    
+    // Validate that we have a valid date
+    if (isNaN(dateObj.getTime())) {
+      return false;
+    }
+    
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const selectedDateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const selectedDateOnly = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
     
     // Get booking limits from business settings (check both old and new field names)
     const minNoticeHours = business?.bookingPolicy?.minNoticeHours || business?.minBookingNoticeHours || 24; // Default 24 hours
@@ -529,7 +589,9 @@ export default function BookingPage() {
 
   // Helper function to check if a time slot with buffer time is valid
   const isTimeSlotValid = (timeStr: string, staff: any, date: Date, services: any[]) => {
-    const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    const dateObj = ensureDate(date);
+    if (!dateObj) return false;
+    const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
     const slotStart = timeToMinutes(timeStr);
     const totalServiceDuration = services.reduce((total, service) => total + (service.duration || 60), 0);
     const maxBufferTime = services.reduce((max, service) => Math.max(max, service.bufferTime || 0), 0);
@@ -578,7 +640,9 @@ export default function BookingPage() {
     const hasExistingAppointment = appointments.some((apt: any) => {
       if (apt.staffId !== staff.id) return false;
       const aptDate = apt.date?.toDate ? apt.date.toDate() : new Date(apt.date);
-      if (aptDate.toDateString() !== date.toDateString()) return false;
+      const dateObj = ensureDate(date);
+      if (!dateObj) return false;
+      if (aptDate.toDateString() !== dateObj.toDateString()) return false;
       
       const aptStart = timeToMinutes(apt.time);
       const aptEnd = aptStart + (apt.duration || 60) + (business?.bufferTime || 0);
@@ -851,7 +915,9 @@ export default function BookingPage() {
       
       if (!selectedStaff?.id && selectedDate && selectedTime) {
         // Find available staff for this time slot
-        const dayOfWeek = selectedDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+        const selectedDateObj = ensureDate(selectedDate);
+        if (!selectedDateObj) return [];
+        const dayOfWeek = selectedDateObj.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
         const slotStart = timeToMinutes(selectedTime);
         const maxBufferTime = selectedServices.reduce((max, service) => Math.max(max, service.bufferTime || 0), 0);
         const slotEnd = slotStart + getTotalDuration() + maxBufferTime;
@@ -881,7 +947,9 @@ export default function BookingPage() {
           const hasAppointment = appointments.some((apt: any) => {
             if (apt.staffId !== member.id) return false;
             const aptDate = apt.date?.toDate ? apt.date.toDate() : new Date(apt.date);
-            if (aptDate.toDateString() !== selectedDate.toDateString()) return false;
+            const selectedDateObj = ensureDate(selectedDate);
+            if (!selectedDateObj) return false;
+            if (aptDate.toDateString() !== selectedDateObj.toDateString()) return false;
             
             const aptStart = timeToMinutes(apt.time);
             const aptEnd = aptStart + (apt.duration || 60) + (business?.bufferTime || 0);
@@ -1089,12 +1157,24 @@ export default function BookingPage() {
         const pointsToDeduct = selectedReward ? selectedReward.points : pointsToUse;
         
         // Deduct used points or reward points first (regardless of payment status)
-        if (pointsToDeduct > 0) {
+        if (pointsToDeduct > 0 && clientId) {
           await updateDoc(doc(db, 'clients', clientId), {
             loyaltyPoints: (loyaltyPoints || 0) - pointsToDeduct,
             pointsUsed: pointsToDeduct,
             lastVisit: serverTimestamp(),
           });
+          
+          // Log the transaction
+          const { logLoyaltyTransaction } = await import('@/lib/loyalty');
+          await logLoyaltyTransaction(
+            clientId,
+            'redeemed',
+            pointsToDeduct,
+            selectedReward 
+              ? `Redeemed reward: ${selectedReward.name}` 
+              : `Points redeemed for booking discount`,
+            appointmentId
+          );
         }
         
         // Update reward claimed count if a reward was used
@@ -1119,7 +1199,9 @@ export default function BookingPage() {
           console.log('✅ clientId available for email:', clientId);
         }
 
-        const appointmentDate = selectedDate!.toLocaleDateString('en-US', { 
+        const selectedDateObj = ensureDate(selectedDate);
+        if (!selectedDateObj) return;
+        const appointmentDate = selectedDateObj.toLocaleDateString('en-US', { 
           weekday: 'long', 
           year: 'numeric', 
           month: 'long', 
@@ -1172,7 +1254,7 @@ export default function BookingPage() {
           businessId: emailAppointmentData.businessId
         });
 
-        await fetch('/api/email/send', {
+        const emailResponse = await fetch('/api/email/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1183,9 +1265,20 @@ export default function BookingPage() {
             appointmentData: emailAppointmentData,
           }),
         });
-      } catch (emailError) {
-        console.error('Failed to send confirmation email:', emailError);
-        // Don't fail the booking if email fails
+        
+        const emailResult = await emailResponse.json();
+        
+        if (!emailResponse.ok) {
+          console.error('❌ Email API error:', emailResult);
+          console.error('❌ Email response status:', emailResponse.status);
+          throw new Error(emailResult.error || 'Failed to send email');
+        }
+        
+        console.log('✅ Booking confirmation email sent successfully:', emailResult);
+      } catch (emailError: any) {
+        console.error('❌ Failed to send confirmation email:', emailError);
+        console.error('❌ Email error details:', emailError.message, emailError.stack);
+        // Don't fail the booking if email fails, but log the error
       }
 
       // Success! Redirect to confirmation
@@ -1209,7 +1302,9 @@ export default function BookingPage() {
     const slotTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
     
     // Check if outside business hours for the selected day
-    const dayOfWeek = selectedDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    const selectedDateObj = ensureDate(selectedDate);
+    if (!selectedDateObj) return false;
+    const dayOfWeek = selectedDateObj.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
     const dayHours = business?.hours?.[dayOfWeek];
     
     if (dayHours?.closed) {
@@ -1231,7 +1326,9 @@ export default function BookingPage() {
       // Check if the selected date is within the blocked date range
       const btStart = bt.startDate?.toDate ? bt.startDate.toDate() : new Date(bt.startDate);
       const btEnd = bt.endDate?.toDate ? bt.endDate.toDate() : new Date(bt.endDate);
-      const dateStr = selectedDate.toDateString();
+      const selectedDateObj = ensureDate(selectedDate);
+      if (!selectedDateObj) return false;
+      const dateStr = selectedDateObj.toDateString();
       const btStartStr = btStart.toDateString();
       const btEndStr = btEnd.toDateString();
       
@@ -1247,7 +1344,9 @@ export default function BookingPage() {
     if (!selectedServices.length || !date) return [];
     
     
-    const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    const dateObj = ensureDate(date);
+    if (!dateObj) return [];
+    const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
     const totalServiceDuration = selectedServices.reduce((total, service) => total + (service.duration || 60), 0);
     const maxBufferTime = selectedServices.reduce((max, service) => Math.max(max, service.bufferTime || 0), 0);
     const totalDuration = totalServiceDuration + maxBufferTime;
@@ -1307,7 +1406,9 @@ export default function BookingPage() {
         if (apt.staffId !== member.id && apt.staffId) return false; // Skip if different staff (but check unassigned)
         
         const aptDate = apt.date?.toDate ? apt.date.toDate() : new Date(apt.date);
-        const isSameDate = aptDate.toDateString() === date.toDateString();
+        const dateObj = ensureDate(date);
+        if (!dateObj) return false;
+        const isSameDate = aptDate.toDateString() === dateObj.toDateString();
         
         if (!isSameDate) return false;
         
@@ -1337,8 +1438,9 @@ export default function BookingPage() {
       return [];
     }
     
-    
-    const dayOfWeek = selectedDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    const selectedDateObj = ensureDate(selectedDate);
+    if (!selectedDateObj) return [];
+    const dayOfWeek = selectedDateObj.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
     
     // Get business hours for the location
     const locationHours = selectedLocation?.hours?.[dayOfWeek];
@@ -1378,7 +1480,9 @@ export default function BookingPage() {
     let minHour = openHour;
     let minMinute = openMin;
     
-    if (selectedDate.toDateString() === now.toDateString()) {
+    // selectedDateObj already defined above, reuse it
+    if (!selectedDateObj) return [];
+    if (selectedDateObj.toDateString() === now.toDateString()) {
       // If booking for today, ensure we don't allow times before the minimum notice period
       const minHourToday = minBookingTime.getHours();
       const minMinuteToday = minBookingTime.getMinutes();
@@ -1478,7 +1582,9 @@ export default function BookingPage() {
       return [];
     }
     
-    const dayOfWeek = selectedDate.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    const selectedDateObj = ensureDate(selectedDate);
+    if (!selectedDateObj) return [];
+    const dayOfWeek = selectedDateObj.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
     
     // Get business hours for the location
     const locationHours = selectedLocation?.hours?.[dayOfWeek];
@@ -1517,7 +1623,9 @@ export default function BookingPage() {
     let minHour = openHour;
     let minMinute = openMin;
     
-    if (selectedDate.toDateString() === now.toDateString()) {
+    // selectedDateObj already defined above, reuse it
+    if (!selectedDateObj) return [];
+    if (selectedDateObj.toDateString() === now.toDateString()) {
       // If booking for today, ensure we don't allow times before the minimum notice period
       const minHourToday = minBookingTime.getHours();
       const minMinuteToday = minBookingTime.getMinutes();
@@ -1641,8 +1749,8 @@ export default function BookingPage() {
 
       <div className="max-w-4xl mx-auto px-4 py-4 sm:py-8">
         {/* Progress Steps */}
-        <div className="mb-8">
-          <div className="flex items-center justify-center space-x-2 sm:space-x-4 overflow-x-auto pb-2">
+        <div className="mb-8 px-2 sm:px-0">
+          <div className="flex items-center justify-center space-x-1 sm:space-x-4 overflow-x-auto pb-2 -mx-2 sm:mx-0 px-2 sm:px-0">
             {[
               { num: 1, label: 'Location' },
               { num: 2, label: 'Services' },
@@ -1650,9 +1758,9 @@ export default function BookingPage() {
               { num: 4, label: 'Details' },
             ].map((s) => (
               <div key={s.num} className="flex items-center flex-shrink-0">
-                <div className={`flex items-center ${s.num !== 4 ? 'space-x-2 sm:space-x-4' : ''}`}>
+                <div className={`flex items-center ${s.num !== 4 ? 'space-x-1 sm:space-x-4' : ''}`}>
                   <div 
-                    className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-semibold text-sm sm:text-base ${step >= s.num ? 'text-white' : 'bg-gray-200 text-gray-600'}`}
+                    className={`w-10 h-10 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-semibold text-sm sm:text-base flex-shrink-0 ${step >= s.num ? 'text-white' : 'bg-gray-200 text-gray-600'}`}
                     style={step >= s.num ? { backgroundColor: colorScheme.colors.primary } : {}}
                   >
                     {s.num}
@@ -1666,7 +1774,7 @@ export default function BookingPage() {
                 </div>
                 {s.num !== 4 && (
                   <div 
-                    className={`w-12 h-0.5 ${step > s.num ? '' : 'bg-gray-200'} mx-2`}
+                    className={`w-8 sm:w-12 h-0.5 ${step > s.num ? '' : 'bg-gray-200'} mx-1 sm:mx-2 flex-shrink-0`}
                     style={step > s.num ? { backgroundColor: colorScheme.colors.primary } : {}}
                   />
                 )}
@@ -1877,59 +1985,61 @@ export default function BookingPage() {
 
             <div className="grid md:grid-cols-2 gap-6">
               {/* Calendar */}
-              <div>
+              <div className="min-w-0">
                 <h3 className="font-semibold text-gray-900 mb-4">Select Date</h3>
-                  <input
-                    type="date"
-                    min={(() => {
-                      // Calculate minimum date based on booking policy
-                      const minAdvanceNotice = business?.bookingPolicy?.minNoticeHours || business?.minBookingNoticeHours || 24; // hours
-                      const minDate = new Date();
-                      minDate.setHours(minDate.getHours() + minAdvanceNotice);
-                      return minDate.toISOString().split('T')[0];
-                    })()}
-                    max={(() => {
-                      // Calculate maximum date based on booking policy
-                      const maxAdvanceBooking = business?.bookingPolicy?.maxAdvanceMonths ? business.bookingPolicy.maxAdvanceMonths * 30 : business?.maxAdvanceBookingDays || 90; // Convert months to days
-                      const maxDate = new Date();
-                      maxDate.setDate(maxDate.getDate() + maxAdvanceBooking);
-                      return maxDate.toISOString().split('T')[0];
-                    })()}
-                    onChange={(e) => {
-                      const [year, month, day] = e.target.value.split('-').map(Number);
-                      const selectedDate = new Date(year, month - 1, day, 12, 0, 0);
-                      
-                      // Validate booking limits
-                      if (!isDateWithinBookingLimits(selectedDate)) {
-                        const minNoticeHours = business?.bookingPolicy?.minNoticeHours || business?.minBookingNoticeHours || 24;
-                        const maxAdvanceDays = business?.bookingPolicy?.maxAdvanceMonths ? business.bookingPolicy.maxAdvanceMonths * 30 : business?.maxAdvanceBookingDays || 90;
+                  <div className="w-full">
+                    <input
+                      type="date"
+                      min={(() => {
+                        // Calculate minimum date based on booking policy
+                        const minAdvanceNotice = business?.bookingPolicy?.minNoticeHours || business?.minBookingNoticeHours || 24; // hours
+                        const minDate = new Date();
+                        minDate.setHours(minDate.getHours() + minAdvanceNotice);
+                        return minDate.toISOString().split('T')[0];
+                      })()}
+                      max={(() => {
+                        // Calculate maximum date based on booking policy
+                        const maxAdvanceBooking = business?.bookingPolicy?.maxAdvanceMonths ? business.bookingPolicy.maxAdvanceMonths * 30 : business?.maxAdvanceBookingDays || 90; // Convert months to days
+                        const maxDate = new Date();
+                        maxDate.setDate(maxDate.getDate() + maxAdvanceBooking);
+                        return maxDate.toISOString().split('T')[0];
+                      })()}
+                      onChange={(e) => {
+                        const [year, month, day] = e.target.value.split('-').map(Number);
+                        const selectedDate = new Date(year, month - 1, day, 12, 0, 0);
                         
-                        // Check if it's a holiday
-                        const dateStr = selectedDate.toISOString().split('T')[0];
-                        const isHoliday = business?.holidays?.some((holiday: any) => {
-                          const holidayDate = holiday.date?.toDate ? holiday.date.toDate() : new Date(holiday.date);
-                          const holidayDateStr = holidayDate.toISOString().split('T')[0];
-                          return holidayDateStr === dateStr;
-                        });
-                        
-                        if (isHoliday) {
-                          setToast({ 
-                            message: 'This date is a holiday/closure day and not available for booking', 
-                            type: 'error' 
+                        // Validate booking limits
+                        if (!isDateWithinBookingLimits(selectedDate)) {
+                          const minNoticeHours = business?.bookingPolicy?.minNoticeHours || business?.minBookingNoticeHours || 24;
+                          const maxAdvanceDays = business?.bookingPolicy?.maxAdvanceMonths ? business.bookingPolicy.maxAdvanceMonths * 30 : business?.maxAdvanceBookingDays || 90;
+                          
+                          // Check if it's a holiday
+                          const dateStr = selectedDate.toISOString().split('T')[0];
+                          const isHoliday = business?.holidays?.some((holiday: any) => {
+                            const holidayDate = holiday.date?.toDate ? holiday.date.toDate() : new Date(holiday.date);
+                            const holidayDateStr = holidayDate.toISOString().split('T')[0];
+                            return holidayDateStr === dateStr;
                           });
-                        } else {
-                          setToast({ 
-                            message: `Please select a date between ${minNoticeHours} hours from now and ${maxAdvanceDays} days in advance`, 
-                            type: 'error' 
-                          });
+                          
+                          if (isHoliday) {
+                            setToast({ 
+                              message: 'This date is a holiday/closure day and not available for booking', 
+                              type: 'error' 
+                            });
+                          } else {
+                            setToast({ 
+                              message: `Please select a date between ${minNoticeHours} hours from now and ${maxAdvanceDays} days in advance`, 
+                              type: 'error' 
+                            });
+                          }
+                          return;
                         }
-                        return;
-                      }
-                      
-                      setSelectedDate(selectedDate);
-                    }}
-                    className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-sm sm:text-base"
-                  />
+                        
+                        setSelectedDate(selectedDate);
+                      }}
+                      className="w-full max-w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-sm sm:text-base box-border"
+                    />
+                  </div>
                   <p className="text-sm text-gray-500 mt-2">
                     Bookings require {business?.bookingPolicy?.minNoticeHours || business?.minBookingNoticeHours || 24} hours advance notice and can be made up to {business?.bookingPolicy?.maxAdvanceMonths ? business.bookingPolicy.maxAdvanceMonths + ' months' : (business?.maxAdvanceBookingDays || 90) + ' days'} in advance
                   </p>
@@ -1976,6 +2086,13 @@ export default function BookingPage() {
                             } else {
                               setSelectedStaff(null);
                             }
+                            // Scroll to bottom after a short delay to allow state update
+                            setTimeout(() => {
+                              window.scrollTo({
+                                top: document.documentElement.scrollHeight,
+                                behavior: 'smooth'
+                              });
+                            }, 100);
                           }
                         }}
                         disabled={isDisabled}
@@ -2139,7 +2256,9 @@ export default function BookingPage() {
                   if (!selectedDate || !availableStaffForTime.length) return false;
                   const btStart = bt.startDate?.toDate ? bt.startDate.toDate() : new Date(bt.startDate);
                   const btEnd = bt.endDate?.toDate ? bt.endDate.toDate() : new Date(bt.endDate);
-                  const dateStr = selectedDate.toDateString();
+                  const selectedDateObj = ensureDate(selectedDate);
+                  if (!selectedDateObj) return false;
+                  const dateStr = selectedDateObj.toDateString();
                   return dateStr >= btStart.toDateString() && dateStr <= btEnd.toDateString() && 
                          (bt.staffId === selectedStaff?.id || bt.staffId === 'all');
                 }).length > 0 && (
@@ -2210,12 +2329,15 @@ export default function BookingPage() {
                   <div>
                     <div className="text-sm text-gray-600 mb-1">Date</div>
                     <div className="font-semibold text-gray-900">
-                      {selectedDate?.toLocaleDateString('en-US', { 
+                      {(() => {
+                        const dateObj = selectedDate ? ensureDate(selectedDate) : null;
+                        return dateObj ? dateObj.toLocaleDateString('en-US', { 
                         weekday: 'long', 
                         year: 'numeric', 
                         month: 'long', 
-                        day: 'numeric' 
-                      })}
+                        day: 'numeric'
+                      }) : 'No date selected';
+                      })()}
                     </div>
                   </div>
                   <div>
@@ -2297,6 +2419,7 @@ export default function BookingPage() {
                     checkLoyaltyPoints(e.target.value);
                   }}
                   required
+                  autoComplete="email"
                   className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-sm sm:text-base"
                   placeholder="your@email.com"
                 />
@@ -2442,13 +2565,12 @@ export default function BookingPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone Number *
+                  Phone Number <span className="text-gray-400 text-xs">(Optional)</span>
                 </label>
                 <input
                   type="tel"
                   value={clientInfo.phone}
                   onChange={(e) => setClientInfo({ ...clientInfo, phone: e.target.value })}
-                  required
                   className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-sm sm:text-base"
                   placeholder="(123) 456-7890"
                 />
@@ -2620,7 +2742,7 @@ export default function BookingPage() {
                       handlePaymentTypeSelection('full');
                     }
                   }}
-                  disabled={!clientInfo.name || !clientInfo.email || !clientInfo.phone}
+                  disabled={!clientInfo.name || !clientInfo.email}
                   className="w-full text-white py-4 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ backgroundColor: colorScheme.colors.primary }}
                   onMouseEnter={(e) => !e.currentTarget.disabled && (e.currentTarget.style.backgroundColor = colorScheme.colors.primaryDark)}
@@ -2665,7 +2787,7 @@ export default function BookingPage() {
                         }
                         handlePaymentTypeSelection('deposit');
                       }}
-                      disabled={!clientInfo.name || !clientInfo.email || !clientInfo.phone}
+                      disabled={!clientInfo.name || !clientInfo.email}
                       className="w-full bg-white hover:bg-gray-50 border-2 py-4 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ color: colorScheme.colors.primary, borderColor: colorScheme.colors.primary }}
                     >
@@ -2841,23 +2963,15 @@ export default function BookingPage() {
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
                 <input
                   type="email"
                   value={loginForm.email}
-                  onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
+                  onChange={(e) => setLoginForm({ email: e.target.value })}
                   required
+                  autoComplete="email"
                   className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-sm sm:text-base"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-                <input
-                  type="tel"
-                  value={loginForm.phone}
-                  onChange={(e) => setLoginForm({ ...loginForm, phone: e.target.value })}
-                  required
-                  className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-sm sm:text-base"
+                  placeholder="your@email.com"
                 />
               </div>
               <button
@@ -2870,7 +2984,7 @@ export default function BookingPage() {
 
             <div className="mt-4 text-center">
               <p className="text-sm text-gray-600">
-                We'll create an account for you when you verify your phone number.
+                We'll send a verification code to your email address. We'll create an account for you when you verify your email.
               </p>
             </div>
           </div>

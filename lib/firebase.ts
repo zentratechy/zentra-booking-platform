@@ -14,11 +14,25 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+// Initialize Firebase only if we have valid config
+let app: any = null;
+let auth: any = null;
+let db: any = null;
+let storage: any = null;
 
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+// Only initialize if we're in a browser environment or if config is valid
+if (typeof window !== 'undefined' || (firebaseConfig.apiKey && firebaseConfig.projectId)) {
+  try {
+    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+    auth = getAuth(app);
+    db = getFirestore(app);
+    storage = getStorage(app);
+  } catch (error) {
+    console.error('Firebase initialization error:', error);
+    // Don't throw - allow the app to continue without Firebase in some contexts
+  }
+}
+
+export { auth, db, storage };
 export default app;
 

@@ -16,6 +16,7 @@ export default function DashboardSidebar() {
   const { user, businessId } = useAuth();
   const { colorScheme } = useTheme();
   const [logoURL, setLogoURL] = useState<string | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -86,6 +87,15 @@ export default function DashboardSidebar() {
       icon: (
         <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        </svg>
+      ),
+    },
+    {
+      href: '/dashboard/products',
+      label: 'Products',
+      icon: (
+        <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
         </svg>
       ),
     },
@@ -162,7 +172,7 @@ export default function DashboardSidebar() {
       ),
     },
     {
-      href: '/dashboard/subscription',
+      href: '/subscription',
       label: 'Subscription',
       icon: (
         <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -182,71 +192,120 @@ export default function DashboardSidebar() {
     },
   ];
 
+  // Close mobile menu when route changes
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
+
+  // Close mobile menu on escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, []);
+
   return (
-    <div className="fixed left-0 top-0 h-full w-64 bg-white shadow-lg z-40">
-      <div className="p-6">
-        <Link href="/dashboard" className="block">
-          <div className="flex flex-col items-center space-y-3" style={{ minHeight: '160px' }}>
-            {logoURL ? (
-              <img 
-                src={logoURL} 
-                alt="Business Logo" 
-                className="w-32 h-32 object-contain rounded-lg"
-              />
-            ) : (
-              <div className="w-32 h-32 flex items-center justify-center">
-                {/* Placeholder to reserve space */}
-              </div>
-            )}
-            <h1 
-              className="text-xl font-bold cursor-pointer text-center" 
-              style={{ 
-                fontFamily: "'Playfair Display', serif",
-                color: colorScheme.colors.primary 
-              }}
-            >
-              Zentra
-            </h1>
-          </div>
-        </Link>
-      </div>
+    <>
+      {/* Mobile Menu Button */}
+      <button
+        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-md hover:bg-gray-100 transition-colors"
+        aria-label="Toggle menu"
+      >
+        <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {isMobileMenuOpen ? (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          ) : (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          )}
+        </svg>
+      </button>
 
-      <nav className="px-4 space-y-1">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center px-4 py-1 rounded-lg transition-colors ${
-                isActive
-                  ? 'font-medium'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-              style={isActive ? {
-                backgroundColor: `${colorScheme.colors.primary}15`,
-                color: colorScheme.colors.primary
-              } : undefined}
-            >
-              {item.icon}
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+      {/* Mobile Overlay */}
+      {isMobileMenuOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
 
-      <div className="absolute bottom-0 left-0 right-0 p-4 space-y-2">
-        <button 
-          onClick={handleLogout}
-          className="flex items-center px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg w-full transition-colors"
-        >
-          <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-          Logout
-        </button>
+      {/* Sidebar */}
+      <div className={`
+        fixed left-0 top-0 h-full bg-white shadow-lg z-40
+        transform transition-transform duration-300 ease-in-out
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+        lg:translate-x-0
+        w-64
+      `}>
+        <div className="p-4 lg:p-6">
+          <Link href="/dashboard" className="block" onClick={() => setIsMobileMenuOpen(false)}>
+            <div className="flex flex-col items-center space-y-2 lg:space-y-3" style={{ minHeight: '120px' }}>
+              {logoURL ? (
+                <img 
+                  src={logoURL} 
+                  alt="Business Logo" 
+                  className="w-24 h-24 lg:w-32 lg:h-32 object-contain rounded-lg"
+                />
+              ) : (
+                <div className="w-24 h-24 lg:w-32 lg:h-32 flex items-center justify-center">
+                  {/* Placeholder to reserve space */}
+                </div>
+              )}
+              <h1 
+                className="text-lg lg:text-xl font-bold cursor-pointer text-center" 
+                style={{ 
+                  fontFamily: "'Playfair Display', serif",
+                  color: colorScheme.colors.primary 
+                }}
+              >
+                Zentra
+              </h1>
+            </div>
+          </Link>
+        </div>
+
+        <nav className="px-2 lg:px-4 space-y-1 overflow-y-auto max-h-[calc(100vh-200px)]">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`flex items-center px-3 lg:px-4 py-2 lg:py-1 rounded-lg transition-colors text-sm lg:text-base ${
+                  isActive
+                    ? 'font-medium'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+                style={isActive ? {
+                  backgroundColor: `${colorScheme.colors.primary}15`,
+                  color: colorScheme.colors.primary
+                } : undefined}
+              >
+                {item.icon}
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="absolute bottom-0 left-0 right-0 p-3 lg:p-4 space-y-2 border-t border-gray-200 bg-white">
+          <button 
+            onClick={handleLogout}
+            className="flex items-center px-3 lg:px-4 py-2 lg:py-3 text-red-600 hover:bg-red-50 rounded-lg w-full transition-colors text-sm lg:text-base"
+          >
+            <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            Logout
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

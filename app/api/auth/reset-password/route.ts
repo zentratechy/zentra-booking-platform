@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { doc, getDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { adminAuth } from '@/lib/firebase-admin';
+import { adminAuth, adminDb } from '@/lib/firebase-admin';
 
 export async function POST(request: Request) {
   try {
@@ -14,32 +12,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validate the reset token
-    const resetDoc = await getDoc(doc(db, 'password_resets', email));
-    
-    if (!resetDoc.exists()) {
-      return NextResponse.json(
-        { error: 'Invalid or expired reset token' },
-        { status: 400 }
-      );
-    }
-
-    const resetData = resetDoc.data();
-    const now = new Date();
-    const expires = resetData.expires.toDate();
-
-    if (resetData.token !== token || now > expires) {
-      return NextResponse.json(
-        { error: 'Invalid or expired reset token' },
-        { status: 400 }
-      );
-    }
-
     // Check if Firebase Admin is available
-    if (!adminAuth) {
-      // Clean up the reset token
-      await deleteDoc(doc(db, 'password_resets', email));
-      
+    if (!adminAuth || !adminDb) {
       console.log('⚠️ Firebase Admin not configured, falling back to support contact');
       
       return NextResponse.json({ 
@@ -47,6 +21,34 @@ export async function POST(request: Request) {
         message: 'Password reset token validated! Please contact support at support@mail.zentrabooking.com to complete your password reset. We will verify your identity and update your password within 24 hours.',
         requiresSupport: true
       });
+    }
+
+    // Validate the reset token using Firebase Admin
+    const resetDoc = await adminDb.collection('password_resets').doc(email).get();
+    
+    if (!resetDoc.exists) {
+      return NextResponse.json(
+        { error: 'Invalid or expired reset token' },
+        { status: 400 }
+      );
+    }
+
+    const resetData = resetDoc.data();
+    if (!resetData) {
+      return NextResponse.json(
+        { error: 'Invalid reset token data' },
+        { status: 400 }
+      );
+    }
+
+    const now = new Date();
+    const expires = resetData.expires.toDate ? resetData.expires.toDate() : new Date(resetData.expires);
+
+    if (resetData.token !== token || now > expires) {
+      return NextResponse.json(
+        { error: 'Invalid or expired reset token' },
+        { status: 400 }
+      );
     }
 
     // Find the user by email using Firebase Admin
@@ -69,7 +71,7 @@ export async function POST(request: Request) {
     });
 
     // Clean up the reset token
-    await deleteDoc(doc(db, 'password_resets', email));
+    await adminDb.collection('password_resets').doc(email).delete();
 
     console.log('✅ Password updated successfully for user:', email);
 

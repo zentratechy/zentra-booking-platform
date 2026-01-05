@@ -4,9 +4,15 @@ import { doc, getDoc } from 'firebase/firestore';
 import Stripe from 'stripe';
 import { trackApiRequest } from '@/lib/api-middleware';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-09-30.clover',
-});
+// Initialize Stripe lazily to avoid build-time errors
+const getStripe = () => {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error('STRIPE_SECRET_KEY is not configured');
+  }
+  return new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: '2025-09-30.clover',
+  });
+};
 
 export async function GET(request: NextRequest) {
   try {
@@ -47,6 +53,7 @@ export async function GET(request: NextRequest) {
     let hasActiveSubscription = false;
     if (stripeCustomerId) {
       try {
+        const stripe = getStripe();
         const subscriptions = await stripe.subscriptions.list({
           customer: stripeCustomerId,
           status: 'active',

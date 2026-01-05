@@ -3,8 +3,15 @@ import { collection, query, where, getDocs, updateDoc, doc, addDoc, serverTimest
 import { db } from '@/lib/firebase';
 import { Resend } from 'resend';
 import { generateBirthdayBonusEmail } from '@/lib/emailTemplates';
+import { logLoyaltyTransaction } from '@/lib/loyalty';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Initialize Resend lazily to avoid build-time errors
+const getResend = () => {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY is not configured');
+  }
+  return new Resend(process.env.RESEND_API_KEY);
+};
 
 export async function GET() {
   try {
@@ -27,9 +34,13 @@ export async function GET() {
       const businessData = businessDoc.data();
       const businessId = businessDoc.id;
       
-      if (!businessData.loyaltyProgram?.settings?.birthdayBonus) continue;
+      // Check if birthday bonus is enabled and configured
+      const loyaltySettings = businessData.loyaltyProgram?.settings;
+      if (!loyaltySettings?.birthdayBonus || !loyaltySettings?.birthdayEnabled) {
+        continue; // Skip if birthday bonus is not enabled or not configured
+      }
       
-      const birthdayBonus = businessData.loyaltyProgram.settings.birthdayBonus;
+      const birthdayBonus = loyaltySettings.birthdayBonus;
       
       // Get clients with birthdays today
       const clientsQuery = query(
@@ -65,6 +76,15 @@ export async function GET() {
               updatedAt: serverTimestamp(),
             });
             
+            // Log the transaction
+            await logLoyaltyTransaction(
+              clientDoc.id,
+              'earned',
+              birthdayBonus,
+              `Birthday bonus - ${birthdayBonus} points`,
+              undefined
+            );
+            
             // Send birthday bonus email
             const emailHtml = generateBirthdayBonusEmail({
               clientName: clientData.name,
@@ -79,6 +99,7 @@ export async function GET() {
               colorScheme: businessData.colorScheme || 'classic'
             });
             
+            const resend = getResend();
             await resend.emails.send({
               from: `${businessData.businessName || businessData.name} <noreply@mail.zentrabooking.com>`,
               to: [clientData.email],

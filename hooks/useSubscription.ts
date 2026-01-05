@@ -63,7 +63,10 @@ export function useSubscription() {
       
       // Determine current plan and limits using the fresh data
       const isTrial = currentTrialStatus?.active || false;
-      const plan = currentSubscription?.plan?.id || 'starter';
+      // Handle both old format (plan as string) and new format (plan as object with id)
+      const plan = typeof currentSubscription?.plan === 'string' 
+        ? currentSubscription.plan.toLowerCase()
+        : (currentSubscription?.plan?.id || 'starter');
       const subscriptionLimits = getSubscriptionLimits(plan.toLowerCase(), isTrial);
       console.log('🔍 useSubscription Debug:', {
         plan,

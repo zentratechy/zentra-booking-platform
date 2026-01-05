@@ -1,0 +1,39 @@
+{
+  "exportDate": "2025-01-24T12:00:00.000Z",
+  "businessId": "test123",
+  "totalServices": 2,
+  "services": [
+    {
+      "id": "test1",
+      "name": "Test Service 1",
+      "category": "Hair Services",
+      "duration": 60,
+      "price": 50,
+      "description": "Test service 1",
+      "depositRequired": true,
+      "depositPercentage": 30,
+      "bufferTime": 15,
+      "createdAt": "2025-01-24T12:00:00.000Z",
+      "businessId": "test123"
+    },
+    {
+      "id": "test2", 
+      "name": "Test Service 2",
+      "category": "Nail Services",
+      "duration": 45,
+      "price": 35,
+      "description": "Test service 2",
+      "depositRequired": false,
+      "depositPercentage": 0,
+      "bufferTime": 10,
+      "createdAt": "2025-01-24T12:00:00.000Z",
+      "businessId": "test123"
+    }
+  ]
+}
+
+
+
+
+
+

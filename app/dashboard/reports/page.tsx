@@ -57,6 +57,12 @@ function ReportsContent() {
   const [topServices, setTopServices] = useState<any[]>([]);
   const [serviceRevenue, setServiceRevenue] = useState<any[]>([]);
   
+  // Product Data
+  const [productSales, setProductSales] = useState<any[]>([]);
+  const [totalProductRevenue, setTotalProductRevenue] = useState(0);
+  const [totalProductUnits, setTotalProductUnits] = useState(0);
+  const [topProducts, setTopProducts] = useState<any[]>([]);
+  
   // Staff Data
   const [staffPerformance, setStaffPerformance] = useState<any[]>([]);
   
@@ -274,6 +280,53 @@ function ReportsContent() {
         .sort((a, b) => b.revenue - a.revenue)
         .slice(0, 10);
       setServiceRevenue(serviceRevenueData);
+
+      // Product sales analysis
+      const productMap = new Map();
+      const productRevenueMap = new Map();
+      let totalProductRev = 0;
+      let totalUnits = 0;
+      
+      filteredAppointmentsData.forEach((apt: any) => {
+        if (apt.products && Array.isArray(apt.products) && apt.products.length > 0) {
+          apt.products.forEach((product: any) => {
+            const productName = product.name || product.productName || 'Unknown Product';
+            const quantity = product.quantity || 1;
+            const productTotal = product.total || (product.price || 0) * quantity;
+            
+            // Count units sold
+            totalUnits += quantity;
+            
+            // Track by product name
+            productMap.set(productName, (productMap.get(productName) || 0) + quantity);
+            
+            // Track revenue (only if payment is paid or partial)
+            if (apt.payment?.status === 'paid' || apt.payment?.status === 'partial') {
+              productRevenueMap.set(productName, (productRevenueMap.get(productName) || 0) + productTotal);
+              totalProductRev += productTotal;
+            }
+          });
+        }
+      });
+      
+      setTotalProductRevenue(totalProductRev);
+      setTotalProductUnits(totalUnits);
+      
+      const topProductsData = Array.from(productMap.entries())
+        .map(([name, units]) => ({ 
+          name, 
+          units, 
+          revenue: productRevenueMap.get(name) || 0 
+        }))
+        .sort((a, b) => b.units - a.units)
+        .slice(0, 10);
+      setTopProducts(topProductsData);
+      
+      const productSalesData = Array.from(productRevenueMap.entries())
+        .map(([name, revenue]) => ({ name, revenue, units: productMap.get(name) || 0 }))
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 10);
+      setProductSales(productSalesData);
 
       // Staff performance
       const staffMap = new Map();
@@ -539,6 +592,11 @@ function ReportsContent() {
       ['Points Redeemed This Period', loyaltyStats.pointsRedeemedThisPeriod],
       ['Average Points Per Client', loyaltyStats.averagePointsPerClient.toFixed(1)],
       [''],
+      ['PRODUCT SALES SUMMARY'],
+      ['Total Product Revenue', formatPrice(totalProductRevenue, currency)],
+      ['Total Units Sold', totalProductUnits],
+      ['Average Price per Unit', totalProductUnits > 0 ? formatPrice(totalProductRevenue / totalProductUnits, currency) : formatPrice(0, currency)],
+      [''],
       ['GIFT VOUCHER SUMMARY'],
       ['Total Vouchers', giftVoucherStats.totalVouchers],
       ['Total Value', formatPrice(giftVoucherStats.totalValue, currency)],
@@ -645,11 +703,16 @@ function ReportsContent() {
         'Client Name',
         'Client Email',
         'Service Name',
+        'Service Price',
+        'Products',
+        'Product Quantity',
+        'Product Price',
+        'Total Product Price',
+        'Total Price (Service + Products)',
         'Staff Name',
         'Date',
         'Time',
         'Duration (min)',
-        'Price',
         'Payment Status',
         'Payment Method',
         'Amount Paid',
@@ -669,23 +732,50 @@ function ReportsContent() {
         const appointmentDate = appointment.date?.toDate ? appointment.date.toDate() : new Date(appointment.date);
         const createdDate = appointment.createdAt?.toDate ? appointment.createdAt.toDate() : new Date(appointment.createdAt);
         
+        // Calculate service and product prices
+        const servicePrice = appointment.servicePrice !== undefined 
+          ? appointment.servicePrice 
+          : (appointment.price || 0) - (appointment.productsPrice || 0);
+        const productsPrice = appointment.productsPrice !== undefined
+          ? appointment.productsPrice
+          : (appointment.products || []).reduce((total: number, p: any) => 
+              total + (p.total || (p.price || 0) * (p.quantity || 1)), 
+            0);
+        const totalPrice = appointment.price || (servicePrice + productsPrice);
+        
+        // Format products for CSV
+        const products = appointment.products && Array.isArray(appointment.products) && appointment.products.length > 0
+          ? appointment.products.map((p: any) => p.name || 'Unknown Product').join('; ')
+          : '';
+        const productQuantities = appointment.products && Array.isArray(appointment.products) && appointment.products.length > 0
+          ? appointment.products.map((p: any) => p.quantity || 1).join('; ')
+          : '';
+        const productPrices = appointment.products && Array.isArray(appointment.products) && appointment.products.length > 0
+          ? appointment.products.map((p: any) => formatPrice(p.price || 0, currency)).join('; ')
+          : '';
+        
         csvData.push([
           appointment.id,
           appointment.clientName || '',
           appointment.clientEmail || '',
           appointment.serviceName || '',
+          formatPrice(servicePrice, currency),
+          products || '',
+          productQuantities || '',
+          productPrices || '',
+          formatPrice(productsPrice, currency),
+          formatPrice(totalPrice, currency),
           appointment.staffName || '',
           appointmentDate.toLocaleDateString(),
           appointment.time || '',
           appointment.duration || 0,
-          formatPrice(appointment.price || 0, currency),
           appointment.payment?.status || '',
           appointment.payment?.method || '',
           formatPrice(appointment.payment?.amount || 0, currency),
           appointment.payment?.depositPaid ? 'Yes' : 'No',
           appointment.payment?.depositRequired ? 'Yes' : 'No',
           appointment.payment?.depositPercentage || 0,
-          formatPrice((appointment.price || 0) - (appointment.payment?.amount || 0), currency),
+          formatPrice(totalPrice - (appointment.payment?.amount || 0), currency),
           appointment.status || '',
           appointment.locationName || '',
           appointment.notes || '',
@@ -780,7 +870,7 @@ function ReportsContent() {
     return (
       <div className="min-h-screen bg-soft-cream">
         <DashboardSidebar />
-        <div className="ml-64 min-h-screen flex items-center justify-center">
+        <div className="lg:ml-64 min-h-screen flex items-center justify-center">
           <div className="text-center">
             <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-gray-600">Loading report data...</p>
@@ -798,7 +888,7 @@ function ReportsContent() {
   return (
     <div className="min-h-screen bg-soft-cream">
       <DashboardSidebar />
-      <div className="ml-64 min-h-screen">
+      <div className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
         <div className="max-w-7xl mx-auto p-6">
           <SubscriptionGuard feature="advancedReporting">
         {/* Header */}
@@ -1088,6 +1178,78 @@ function ReportsContent() {
             </div>
           </div>
         </div>
+
+        {/* Product Sales */}
+        {totalProductRevenue > 0 && (
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Product Sales</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                <div className="text-sm text-gray-600 mb-1">Total Product Revenue</div>
+                <div className="text-2xl font-bold text-gray-900">{formatPrice(totalProductRevenue, currency)}</div>
+              </div>
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                <div className="text-sm text-gray-600 mb-1">Total Units Sold</div>
+                <div className="text-2xl font-bold text-gray-900">{totalProductUnits}</div>
+              </div>
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                <div className="text-sm text-gray-600 mb-1">Average Price per Unit</div>
+                <div className="text-2xl font-bold text-gray-900">
+                  {totalProductUnits > 0 ? formatPrice(totalProductRevenue / totalProductUnits, currency) : formatPrice(0, currency)}
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Top Selling Products */}
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                <h3 className="font-semibold text-gray-900 mb-4">Top Selling Products (Units)</h3>
+                <div className="space-y-3">
+                  {topProducts.map((product, idx) => (
+                    <div key={idx} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-semibold text-sm">
+                          {idx + 1}
+                        </div>
+                        <p className="font-medium text-gray-900">{product.name}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-gray-900">{product.units} units</p>
+                        <p className="text-sm text-gray-600">{formatPrice(product.revenue, currency)}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {topProducts.length === 0 && (
+                    <p className="text-gray-500 text-center py-4">No product sales data available</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Top Revenue Products */}
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                <h3 className="font-semibold text-gray-900 mb-4">Top Revenue Products</h3>
+                <div className="space-y-3">
+                  {productSales.map((product, idx) => (
+                    <div key={idx} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 font-semibold text-sm">
+                          {idx + 1}
+                        </div>
+                        <p className="font-medium text-gray-900">{product.name}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-gray-900">{formatPrice(product.revenue, currency)}</p>
+                        <p className="text-sm text-gray-600">{product.units} units</p>
+                      </div>
+                    </div>
+                  ))}
+                  {productSales.length === 0 && (
+                    <p className="text-gray-500 text-center py-4">No product revenue data available</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Staff Performance */}
         {staffPerformance.length > 0 && (

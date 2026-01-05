@@ -4,9 +4,15 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { trackApiRequest } from '@/lib/api-middleware';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-09-30.clover',
-});
+// Initialize Stripe lazily to avoid build-time errors
+const getStripe = () => {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error('STRIPE_SECRET_KEY is not configured');
+  }
+  return new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: '2025-09-30.clover',
+  });
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -56,6 +62,7 @@ export async function POST(request: NextRequest) {
 
     // Create payment intent on platform account (will be transferred to connected account after payment)
     // This approach works better with Stripe Elements using the platform's publishable key
+    const stripe = getStripe();
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInSmallestUnit,
       currency: currency,

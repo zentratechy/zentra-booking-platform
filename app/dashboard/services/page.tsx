@@ -60,6 +60,8 @@ function ServicesManagementContent() {
         setBusinessSettings(businessData);
       }
 
+      // Fetch all services - Firestore getDocs() fetches all matching documents by default
+      // If you have more than the limit, you'd need pagination, but for most cases this works
       const servicesQuery = query(
         collection(db, 'services'),
         where('businessId', '==', user.uid)
@@ -70,6 +72,7 @@ function ServicesManagementContent() {
         ...doc.data()
       }));
       
+      console.log(`Fetched ${servicesData.length} services from Firestore`);
       setServices(servicesData);
       setLoading(false);
     } catch (error) {
@@ -87,10 +90,10 @@ function ServicesManagementContent() {
     e.preventDefault();
     if (!user) return;
 
-    // Validate price
+    // Validate price (allow 0 for free services like patch tests)
     const priceValue = parseFloat(formData.price);
-    if (isNaN(priceValue) || priceValue <= 0) {
-      showToast('Please enter a valid price greater than 0', 'error');
+    if (isNaN(priceValue) || priceValue < 0) {
+      showToast('Please enter a valid price (0 or greater)', 'error');
       return;
     }
 
@@ -164,10 +167,10 @@ function ServicesManagementContent() {
     e.preventDefault();
     if (!user || !selectedService) return;
 
-    // Validate price
+    // Validate price (allow 0 for free services like patch tests)
     const priceValue = parseFloat(formData.price);
-    if (isNaN(priceValue) || priceValue <= 0) {
-      showToast('Please enter a valid price greater than 0', 'error');
+    if (isNaN(priceValue) || priceValue < 0) {
+      showToast('Please enter a valid price (0 or greater)', 'error');
       return;
     }
 
@@ -286,13 +289,26 @@ function ServicesManagementContent() {
     window.URL.revokeObjectURL(url);
   };
 
+  // Helper function to escape CSV fields
+  const escapeCSVField = (field: any): string => {
+    if (field === null || field === undefined) return '';
+    const str = String(field);
+    // If field contains comma, quote, or newline, wrap in quotes and escape quotes
+    if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+
   const handleCSVExport = () => {
     if (services.length === 0) {
       showToast('No services to export', 'error');
       return;
     }
 
-    // Create CSV content
+    console.log(`Exporting ${services.length} services`);
+
+    // Create CSV content with proper escaping
     const headers = [
       'Name',
       'Category', 
@@ -304,22 +320,25 @@ function ServicesManagementContent() {
       'Buffer Time (minutes)'
     ];
 
-    const csvContent = [
-      headers.join(','),
+    const csvRows = [
+      headers.map(escapeCSVField).join(','),
       ...services.map(service => [
-        service.name || '',
-        service.category || '',
-        service.duration || 30,
-        service.price || 0,
-        service.description || '',
-        service.depositRequired ? 'true' : 'false',
-        service.depositPercentage || 30,
-        service.bufferTime || 0
+        escapeCSVField(service.name || ''),
+        escapeCSVField(service.category || ''),
+        escapeCSVField(service.duration || 30),
+        escapeCSVField(service.price || 0),
+        escapeCSVField(service.description || ''),
+        escapeCSVField(service.depositRequired ? 'true' : 'false'),
+        escapeCSVField(service.depositPercentage || 30),
+        escapeCSVField(service.bufferTime || 0)
       ].join(','))
-    ].join('\n');
+    ];
 
-    // Create and download file
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const csvContent = csvRows.join('\n');
+
+    // Add BOM for Excel compatibility with special characters
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
@@ -328,6 +347,8 @@ function ServicesManagementContent() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    
+    showToast(`Exported ${services.length} services successfully`, 'success');
   };
 
   const handleJSONExport = () => {
@@ -549,10 +570,10 @@ function ServicesManagementContent() {
       <DashboardSidebar />
 
       {/* Main Content */}
-      <div className="ml-64 min-h-screen">
+      <div className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
         {/* Top Bar */}
         <div className="bg-white shadow-sm sticky top-0 z-30">
-          <div className="px-8 py-4 flex justify-between items-center">
+          <div className="px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Services</h2>
               <p className="text-gray-600">Manage your service catalog and pricing</p>
@@ -598,7 +619,7 @@ function ServicesManagementContent() {
         </div>
 
         {/* Content */}
-        <div className="p-8">
+        <div className="p-4 sm:p-6 lg:p-8">
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">

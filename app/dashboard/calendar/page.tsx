@@ -29,8 +29,10 @@ function CalendarContent() {
   const [clients, setClients] = useState<any[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [aftercareTemplates, setAftercareTemplates] = useState<any[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<Array<{id: string, quantity: number}>>([]);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -207,6 +209,20 @@ function CalendarContent() {
         setLocations(locationsData);
         setAftercareTemplates(aftercareData);
         setBlockedTimes(blockedTimesData);
+
+        // Fetch products (include all products, filter active in code if needed)
+        const productsQuery = query(
+          collection(db, 'products'),
+          where('businessId', '==', user.uid)
+        );
+        const productsSnapshot = await getDocs(productsQuery);
+        const productsData = productsSnapshot.docs
+          .map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }))
+          .filter((p: any) => p.active !== false); // Filter out inactive products
+        setProducts(productsData);
         
         // Set default location if only one exists
         if (locationsData.length === 1) {
@@ -550,6 +566,30 @@ function CalendarContent() {
     }
     
     setFormData(formDataToSet);
+    
+    // Load products from appointment if they exist
+    const appointmentProducts = appointment?.products || [];
+    setSelectedProducts(appointmentProducts.map((p: any) => ({
+      id: p.id || p.productId,
+      quantity: p.quantity || 1
+    })));
+    
+    // Ensure products are loaded (refresh if needed)
+    if (products.length === 0 && user) {
+      const productsQuery = query(
+        collection(db, 'products'),
+        where('businessId', '==', user.uid)
+      );
+      const productsSnapshot = await getDocs(productsQuery);
+      const productsData = productsSnapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        .filter((p: any) => p.active !== false);
+      setProducts(productsData);
+    }
+    
     setShowEditModal(true);
   };
 
@@ -630,6 +670,33 @@ function CalendarContent() {
       // Handle multi-service vs single-service appointments
       const isMultiService = selectedAppointment?.services?.length > 1;
       
+      // Calculate products total
+      const productsTotal = selectedProducts.reduce((total, sp) => {
+        const product = products.find(p => p.id === sp.id);
+        return total + ((product?.price || 0) * sp.quantity);
+      }, 0);
+      
+      // Calculate service price
+      const servicePrice = isMultiService 
+        ? (selectedAppointment.price || 0)
+        : (selectedService?.price || 0);
+      
+      // Total price = service + products
+      const totalPrice = servicePrice + productsTotal;
+      
+      // Format products for storage
+      const productsData = selectedProducts.map(sp => {
+        const product = products.find(p => p.id === sp.id);
+        return {
+          id: product?.id,
+          productId: product?.id,
+          name: product?.name,
+          price: product?.price || 0,
+          quantity: sp.quantity,
+          total: (product?.price || 0) * sp.quantity
+        };
+      });
+      
       const updatedData = {
         clientId: formData.clientId,
         clientName: selectedClient?.name,
@@ -646,7 +713,10 @@ function CalendarContent() {
         duration: formData.duration,
         bufferTime: formData.bufferTime || 0,
         endTime: endTime.toTimeString().substring(0, 5),
-        price: isMultiService ? selectedAppointment.price : selectedService?.price,
+        price: totalPrice, // Include products in total price
+        servicePrice: servicePrice, // Store service price separately
+        productsPrice: productsTotal, // Store products total separately
+        products: productsData.length > 0 ? productsData : null, // Store products array
         status: formData.status,
         payment: {
           ...(selectedAppointment.payment ? Object.fromEntries(
@@ -662,15 +732,47 @@ function CalendarContent() {
 
       await updateDoc(doc(db, 'appointments', selectedAppointment.id), updatedData);
       
+      // Update inventory when payment is processed (status changes to paid)
+      const wasPaid = selectedAppointment.payment?.status === 'paid';
+      const isNowPaid = formData.paymentStatus === 'paid';
+      
+      if (isNowPaid && !wasPaid && selectedProducts.length > 0) {
+        // Decrement inventory for each product
+        for (const sp of selectedProducts) {
+          const product = products.find(p => p.id === sp.id);
+          if (product && product.stock !== undefined) {
+            try {
+              await updateDoc(doc(db, 'products', product.id), {
+                stock: increment(-sp.quantity),
+                updatedAt: serverTimestamp(),
+              });
+            } catch (error) {
+              console.error(`Error updating inventory for product ${product.id}:`, error);
+            }
+          }
+        }
+        // Refresh products to show updated stock
+        const productsQuery = query(
+          collection(db, 'products'),
+          where('businessId', '==', user.uid)
+        );
+        const productsSnapshot = await getDocs(productsQuery);
+        const updatedProductsData = productsSnapshot.docs
+          .map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }))
+          .filter((p: any) => p.active !== false); // Filter out inactive products
+        setProducts(updatedProductsData);
+      }
+      
       // Award loyalty points if appointment is being marked as completed
       const wasCompleted = selectedAppointment.status === 'completed';
       const isNowCompleted = formData.status === 'completed';
       
       if (isNowCompleted && !wasCompleted && formData.clientId) {
-        // Calculate total price for loyalty points and client stats
-        const totalPrice = isMultiService 
-          ? (selectedAppointment as any)?.price || 0
-          : selectedService?.price || (selectedAppointment as any)?.price || 0;
+        // Use totalPrice which already includes products
+        const totalPriceForLoyalty = totalPrice;
         
         // Check if customer used points or rewards for this booking
         const usedPoints = (selectedAppointment as any)?.loyaltyPointsUsed || 0;
@@ -688,7 +790,8 @@ function CalendarContent() {
             user.uid,
             formData.clientId,
             selectedClient?.email || '',
-            totalPrice
+            totalPriceForLoyalty,
+            (selectedAppointment as any)?.id // Pass appointment ID for transaction logging
           );
           
           if (pointsAwarded) {
@@ -696,7 +799,7 @@ function CalendarContent() {
             const businessDoc = await getDoc(doc(db, 'businesses', user.uid));
             const businessData = businessDoc.data();
             const pointsPerDollar = businessData?.loyaltyProgram?.settings?.pointsPerDollar || 1;
-            const pointsToAward = Math.floor(totalPrice * pointsPerDollar);
+            const pointsToAward = Math.floor(totalPriceForLoyalty * pointsPerDollar);
             
             // Update local client data
             setClients(clients.map(c => 
@@ -765,7 +868,7 @@ function CalendarContent() {
           try {
             await updateDoc(doc(db, 'clients', formData.clientId), {
               totalVisits: increment(1),
-              totalSpent: increment(totalPrice),
+              totalSpent: increment(totalPriceForLoyalty),
               lastVisit: serverTimestamp(),
             });
             
@@ -938,7 +1041,7 @@ function CalendarContent() {
     return (
       <div className="min-h-screen bg-soft-cream">
         <DashboardSidebar />
-        <div className="ml-64 min-h-screen flex items-center justify-center">
+        <div className="lg:ml-64 min-h-screen flex items-center justify-center pt-16 lg:pt-0">
           <div className="text-center">
             <div className="w-16 h-16 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-gray-600">Loading calendar...</p>
@@ -954,10 +1057,10 @@ function CalendarContent() {
       <ToastContainer />
 
       {/* Main Content */}
-      <div className="ml-64 min-h-screen">
+      <div className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
         {/* Top Bar */}
         <div className="bg-white shadow-sm sticky top-0 z-30">
-          <div className="px-8 py-4">
+          <div className="px-4 sm:px-6 lg:px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex justify-between items-center mb-4">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">Calendar & Appointments</h2>
@@ -998,7 +1101,7 @@ function CalendarContent() {
         </div>
 
         {/* Content */}
-        <div className="p-8">
+        <div className="p-4 sm:p-6 lg:p-8">
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
@@ -1407,7 +1510,10 @@ function CalendarContent() {
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-gray-900">Edit Appointment</h2>
               <button
-                onClick={() => setShowEditModal(false)}
+                onClick={() => {
+                  setShowEditModal(false);
+                  setSelectedProducts([]);
+                }}
                 className="text-gray-400 hover:text-gray-600"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1624,6 +1730,225 @@ function CalendarContent() {
                   <option value="bank_transfer">Bank Transfer</option>
                   <option value="voucher">Voucher</option>
                 </select>
+              </div>
+
+              {/* Products */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Add Products</label>
+                {!products || products.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-4 border border-gray-300 rounded-lg">No products available. Add products in the Products page.</p>
+                ) : (
+                  <>
+                    <div className="flex gap-2 mb-3">
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const productId = e.target.value;
+                          if (productId) {
+                            const product = products.find(p => p.id === productId);
+                            if (product) {
+                              const existing = selectedProducts.find(p => p.id === productId);
+                              if (existing) {
+                                // Increase quantity if already selected
+                                setSelectedProducts(selectedProducts.map(p => 
+                                  p.id === productId ? { ...p, quantity: p.quantity + 1 } : p
+                                ));
+                              } else {
+                                // Add new product
+                                setSelectedProducts([...selectedProducts, { id: productId, quantity: 1 }]);
+                              }
+                            }
+                            // Reset dropdown
+                            e.target.value = '';
+                          }
+                        }}
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                      >
+                        <option value="">Select a product to add...</option>
+                        {products
+                          .filter(p => p.active !== false)
+                          .map((product) => {
+                            const isOutOfStock = product.stock === 0;
+                            const isLowStock = product.stock > 0 && product.stock <= 10;
+                            const selectedProduct = selectedProducts.find(p => p.id === product.id);
+                            const availableStock = product.stock !== undefined ? product.stock - (selectedProduct?.quantity || 0) : null;
+                            
+                            return (
+                              <option 
+                                key={product.id} 
+                                value={product.id}
+                                disabled={isOutOfStock || (availableStock !== null && availableStock <= 0)}
+                              >
+                                {product.name} - {formatPrice(product.price || 0, currency)}
+                                {isOutOfStock ? ' (Out of Stock)' : ''}
+                                {isLowStock && !isOutOfStock ? ` (Low Stock: ${product.stock})` : ''}
+                                {availableStock !== null && availableStock > 0 && availableStock <= 10 ? ` (${availableStock} left)` : ''}
+                              </option>
+                            );
+                          })}
+                      </select>
+                    </div>
+                    
+                    {/* Selected Products List */}
+                    {selectedProducts.length > 0 && (
+                      <div className="border border-gray-300 rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
+                        {selectedProducts.map((sp) => {
+                          const product = products.find(p => p.id === sp.id);
+                          if (!product) return null;
+                          const isOutOfStock = product.stock === 0;
+                          const availableStock = product.stock !== undefined ? product.stock : null;
+                          
+                          return (
+                            <div key={sp.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2">
+                                  <span className="font-medium text-gray-900">{product.name}</span>
+                                  {isOutOfStock && (
+                                    <span className="text-xs text-red-600 font-medium">Out of Stock</span>
+                                  )}
+                                </div>
+                                <div className="text-sm text-gray-600">
+                                  {formatPrice(product.price || 0, currency)} each
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2 ml-4">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (sp.quantity > 1) {
+                                      setSelectedProducts(selectedProducts.map(p => 
+                                        p.id === sp.id ? { ...p, quantity: p.quantity - 1 } : p
+                                      ));
+                                    } else {
+                                      setSelectedProducts(selectedProducts.filter(p => p.id !== sp.id));
+                                    }
+                                  }}
+                                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-100"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                  </svg>
+                                </button>
+                                <span className="w-8 text-center font-medium">{sp.quantity}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (isOutOfStock) return;
+                                    if (availableStock !== null && sp.quantity >= availableStock) return;
+                                    setSelectedProducts(selectedProducts.map(p => 
+                                      p.id === sp.id ? { ...p, quantity: p.quantity + 1 } : p
+                                    ));
+                                  }}
+                                  disabled={isOutOfStock || (availableStock !== null && sp.quantity >= availableStock)}
+                                  className="w-8 h-8 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                  </svg>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedProducts(selectedProducts.filter(p => p.id !== sp.id));
+                                  }}
+                                  className="ml-2 w-8 h-8 flex items-center justify-center border border-red-300 text-red-600 rounded-lg hover:bg-red-50"
+                                  title="Remove product"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                )}
+                {selectedProducts.length > 0 && (
+                  <div className="mt-3 p-3 bg-primary/5 rounded-lg border border-primary/20">
+                    <div className="text-sm font-semibold text-gray-900 mb-1">Products Total:</div>
+                    <div className="text-lg font-bold text-gray-900">
+                      {formatPrice(
+                        selectedProducts.reduce((total, sp) => {
+                          const product = products.find(p => p.id === sp.id);
+                          return total + ((product?.price || 0) * sp.quantity);
+                        }, 0),
+                        currency
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Show existing products in appointment */}
+                {selectedAppointment?.products && selectedAppointment.products.length > 0 && selectedProducts.length === 0 && (
+                  <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="text-sm font-medium text-blue-900 mb-2">Current Products in Appointment:</div>
+                    <div className="space-y-1">
+                      {selectedAppointment.products.map((p: any, idx: number) => (
+                        <div key={idx} className="flex justify-between text-sm text-blue-800">
+                          <span>{p.name || p.productName} x{p.quantity || 1}</span>
+                          <span className="font-medium">{formatPrice((p.total || (p.price || 0) * (p.quantity || 1)), currency)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-blue-200 flex justify-between font-semibold text-blue-900">
+                      <span>Products Total:</span>
+                      <span>{formatPrice(
+                        selectedAppointment.products.reduce((total: number, p: any) => 
+                          total + (p.total || (p.price || 0) * (p.quantity || 1)), 
+                        0),
+                        currency
+                      )}</span>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Price Breakdown */}
+                {(selectedProducts.length > 0 || (selectedAppointment?.products && selectedAppointment.products.length > 0)) && (
+                  <div className="mt-3 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                    <div className="text-sm font-semibold text-gray-900 mb-3">Price Breakdown:</div>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Service:</span>
+                        <span className="font-medium">{formatPrice(
+                          selectedAppointment?.services?.length > 1
+                            ? (selectedAppointment.price || 0) - (selectedAppointment.productsPrice || 0)
+                            : (services.find(s => s.id === formData.serviceId)?.price || selectedAppointment?.servicePrice || selectedAppointment?.price || 0) - (selectedAppointment?.productsPrice || 0),
+                          currency
+                        )}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Products:</span>
+                        <span className="font-medium">{formatPrice(
+                          selectedProducts.length > 0
+                            ? selectedProducts.reduce((total, sp) => {
+                                const product = products.find(p => p.id === sp.id);
+                                return total + ((product?.price || 0) * sp.quantity);
+                              }, 0)
+                            : (selectedAppointment?.productsPrice || selectedAppointment?.products?.reduce((total: number, p: any) => 
+                                total + (p.total || (p.price || 0) * (p.quantity || 1)), 
+                              0) || 0),
+                          currency
+                        )}</span>
+                      </div>
+                      <div className="pt-2 border-t border-gray-300 flex justify-between font-bold text-lg">
+                        <span>Total:</span>
+                        <span>{formatPrice(
+                          selectedProducts.length > 0
+                            ? (services.find(s => s.id === formData.serviceId)?.price || selectedAppointment?.servicePrice || selectedAppointment?.price || 0) + 
+                              selectedProducts.reduce((total, sp) => {
+                                const product = products.find(p => p.id === sp.id);
+                                return total + ((product?.price || 0) * sp.quantity);
+                              }, 0)
+                            : (selectedAppointment?.price || 0),
+                          currency
+                        )}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Notes */}

@@ -8,3 +8,5 @@ firebase-debug.*.log
 .firebase/
 functions/lib/
 functions/node_modules/
+.vercel
+.env*.local

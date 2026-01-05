@@ -1,0 +1,38 @@
+Zentra Site Backup
+==================
+Backup Date: Sat Dec 20 11:14:04 GMT 2025
+Backup Directory: backups/zentra_backup_20251220_111404
+
+Contents:
+---------
+1. code_backup.tar.gz - Git repository snapshot
+2. git_full_backup.bundle - Complete Git history (all branches)
+3. Configuration files (firebase.json, vercel.json, etc.)
+4. Documentation files
+5. ENVIRONMENT_VARIABLES.md - Checklist of required env vars
+
+Firestore Data:
+--------------
+Firestore data should be exported separately using:
+gcloud firestore export gs://[BUCKET]/firestore_export_20251220_111404
+
+Firebase Storage:
+----------------
+Storage files should be backed up separately using:
+gsutil -m cp -r gs://[BUCKET]/storage gs://[BACKUP_BUCKET]/storage_20251220_111404
+
+Restore Instructions:
+--------------------
+1. Extract code_backup.tar.gz or use git_full_backup.bundle
+2. Restore Firestore from export
+3. Restore Storage files
+4. Set environment variables
+5. Run: npm install
+6. Deploy to Vercel or run locally
+
+Git Bundle Restore:
+------------------
+To restore from git bundle:
+git clone git_full_backup.bundle restored-repo
+cd restored-repo
+git checkout main

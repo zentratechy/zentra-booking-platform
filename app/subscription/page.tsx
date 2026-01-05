@@ -22,14 +22,14 @@ interface SubscriptionPlan {
 
 interface CurrentSubscription {
   id: string;
-  plan: string;
+  plan: string | { id: string; name: string }; // Support both old (string) and new (object) format
   status: string;
   currentPeriodEnd: string;
   priceId: string;
 }
 
 export default function SubscriptionPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { showToast, ToastContainer } = useToast();
@@ -39,12 +39,16 @@ export default function SubscriptionPage() {
   const [isUKCustomer, setIsUKCustomer] = useState<boolean | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [trialStatus, setTrialStatus] = useState<any>(null);
+  const [changingPlan, setChangingPlan] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) {
-      router.push('/login');
+    // Wait for auth to finish loading before checking user
+    if (authLoading) {
       return;
     }
+
+    // Don't redirect - allow access to subscription page even without user
+    // This is critical for expired trial users who need to subscribe
 
     // Check for success/cancel messages
     const success = searchParams.get('success');
@@ -68,11 +72,17 @@ export default function SubscriptionPage() {
       });
     }
 
-    fetchPlans();
-    fetchCurrentSubscription();
-    fetchTrialStatus();
+    // Only fetch data if user exists
+    if (user) {
+      fetchPlans();
+      fetchCurrentSubscription();
+      fetchTrialStatus();
+    } else {
+      // Still fetch plans even without user (for public viewing)
+      fetchPlans();
+    }
     checkUKLocation();
-  }, [user, searchParams, router]);
+  }, [user, authLoading, searchParams, router]);
 
   const fetchPlans = async () => {
     try {
@@ -85,23 +95,35 @@ export default function SubscriptionPage() {
   };
 
   const fetchCurrentSubscription = async () => {
+    if (!user?.uid) {
+      setLoading(false);
+      return;
+    }
     try {
-      const response = await fetch(`/api/subscriptions/current?businessId=${user?.uid}`);
+      const response = await fetch(`/api/subscriptions/current?businessId=${user.uid}`);
       const data = await response.json();
       if (data.subscription) {
         setCurrentSubscription(data.subscription);
       }
     } catch (error) {
       console.error('Error fetching current subscription:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const fetchTrialStatus = async () => {
+    if (!user?.uid) {
+      setLoading(false);
+      return;
+    }
     try {
-      const response = await fetch(`/api/trial/status?businessId=${user?.uid}`);
+      const response = await fetch(`/api/trial/status?businessId=${user.uid}`);
       const data = await response.json();
       if (data.trial) {
         setTrialStatus(data.trial);
+        // Don't let trial status changes affect the page - preserve expired parameter
+        // If user came with expired=true, keep showing that message
       }
     } catch (error) {
       console.error('Error fetching trial status:', error);
@@ -116,35 +138,70 @@ export default function SubscriptionPage() {
   };
 
   const handleUpgrade = async (planId: string) => {
+    setChangingPlan(planId);
     try {
-      const response = await fetch('/api/subscriptions/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          businessId: user?.uid,
-          planId: planId,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.url) {
-        // Redirect to Stripe Checkout
-        window.location.href = data.url;
-      } else {
-        setMessage({
-          type: 'error',
-          text: data.error || 'Failed to create subscription'
+      // If user has an existing subscription, update it instead of creating new one
+      if (currentSubscription) {
+        const response = await fetch('/api/subscriptions/update', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            businessId: user?.uid,
+            planId: planId,
+          }),
         });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          setMessage({
+            type: 'success',
+            text: data.message || `Successfully upgraded to ${planId} plan. Your access is immediate!`
+          });
+          // Refresh subscription data
+          await fetchCurrentSubscription();
+        } else {
+          setMessage({
+            type: 'error',
+            text: data.error || 'Failed to update subscription'
+          });
+        }
+      } else {
+        // No existing subscription - create new one via Stripe Checkout
+        const response = await fetch('/api/subscriptions/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            businessId: user?.uid,
+            planId: planId,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.url) {
+          // Redirect to Stripe Checkout
+          window.location.href = data.url;
+          return; // Don't clear changingPlan since we're redirecting
+        } else {
+          setMessage({
+            type: 'error',
+            text: data.error || 'Failed to create subscription'
+          });
+        }
       }
     } catch (error) {
-      console.error('Error creating subscription:', error);
+      console.error('Error handling subscription:', error);
       setMessage({
         type: 'error',
-        text: 'Failed to create subscription. Please try again.'
+        text: 'Failed to process subscription. Please try again.'
       });
+    } finally {
+      setChangingPlan(null);
     }
   };
 
@@ -197,7 +254,7 @@ export default function SubscriptionPage() {
     }
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-soft-cream flex items-center justify-center">
         <div className="text-center">
@@ -280,8 +337,8 @@ export default function SubscriptionPage() {
           </div>
         )}
 
-        {/* Expired Trial Banner */}
-        {trialStatus?.expired && (
+        {/* Expired Trial Banner - Show if URL has expired=true OR if trial status says expired */}
+        {(searchParams.get('expired') === 'true' || trialStatus?.expired) && (
           <div className="bg-red-50 border-l-4 border-red-400 p-6 mb-8 rounded-lg">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -318,7 +375,11 @@ export default function SubscriptionPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Current Subscription</h2>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-lg font-semibold text-gray-900">{currentSubscription.plan}</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {typeof currentSubscription.plan === 'string' 
+                    ? currentSubscription.plan 
+                    : currentSubscription.plan.name}
+                </p>
                 <p className="text-gray-600">
                   Status: <span className={`font-medium ${
                     currentSubscription.status === 'active' ? 'text-green-600' : 'text-red-600'
@@ -388,19 +449,64 @@ export default function SubscriptionPage() {
               </ul>
 
               <div className="text-center">
-                <button
-                  onClick={() => handleUpgrade(plan.id)}
-                  disabled={isUKCustomer === false}
-                  className={`w-full py-3 px-6 rounded-lg font-medium transition-colors ${
-                    isUKCustomer === false
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : plan.id === 'professional'
-                      ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                      : 'bg-gray-900 hover:bg-gray-800 text-white'
-                  }`}
-                >
-                  {currentSubscription ? 'Change Plan' : 'Subscribe Now'}
-                </button>
+                {(() => {
+                  // Map plan name to plan ID for comparison
+                  const planNameToId: { [key: string]: string } = {
+                    'Starter': 'starter',
+                    'Professional': 'professional',
+                    'Business': 'business'
+                  };
+                  
+                  // Get current plan name (handle both string and object formats)
+                  const currentPlanName = currentSubscription 
+                    ? (typeof currentSubscription.plan === 'string' 
+                        ? currentSubscription.plan 
+                        : currentSubscription.plan.name)
+                    : null;
+                  
+                  const currentPlanId = currentPlanName 
+                    ? planNameToId[currentPlanName] 
+                    : null;
+                  
+                  const isCurrentPlan = currentPlanId === plan.id;
+                  
+                  if (isCurrentPlan) {
+                    return (
+                      <div className="w-full py-3 px-6 rounded-lg font-medium bg-green-100 text-green-800 border-2 border-green-300">
+                        ✓ Current Plan
+                      </div>
+                    );
+                  }
+                  
+                  const isChanging = changingPlan === plan.id;
+                  const isDisabled = isUKCustomer === false || changingPlan !== null;
+                  
+                  return (
+                    <button
+                      onClick={() => handleUpgrade(plan.id)}
+                      disabled={isDisabled}
+                      className={`w-full py-3 px-6 rounded-lg font-medium transition-colors flex items-center justify-center ${
+                        isDisabled
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : plan.id === 'professional'
+                          ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                          : 'bg-gray-900 hover:bg-gray-800 text-white'
+                      }`}
+                    >
+                      {isChanging ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Changing Plan...
+                        </>
+                      ) : (
+                        currentSubscription ? 'Change Plan' : 'Subscribe Now'
+                      )}
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           ))}

@@ -426,7 +426,8 @@ export default function PaymentPage() {
             appointment.businessId,
             appointment.clientId,
             appointment.clientEmail,
-            remainingAmount
+            remainingAmount,
+            appointment.id // Pass appointment ID for transaction logging
           );
           
           if (pointsAwarded) {

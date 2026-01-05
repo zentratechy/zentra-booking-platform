@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { Resend } from 'resend';
-
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: NextRequest) {
   try {
@@ -71,7 +68,11 @@ export async function POST(request: NextRequest) {
 
     // Send voucher email to recipient
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://zentrabooking.com'}/api/email/send-voucher`, {
+      const emailUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://zentrabooking.com'}/api/email/send-voucher`;
+      console.log('📧 Sending voucher email to:', recipientEmail);
+      console.log('📧 Email endpoint:', emailUrl);
+      
+      const emailResponse = await fetch(emailUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -87,15 +88,28 @@ export async function POST(request: NextRequest) {
           expiryDate: expiryDate.toISOString(),
         }),
       });
-      console.log('✅ Voucher email sent to recipient');
-    } catch (emailError) {
-      console.error('❌ Error sending voucher email:', emailError);
+
+      if (!emailResponse.ok) {
+        const errorData = await emailResponse.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ Email API returned error:', emailResponse.status, errorData);
+        throw new Error(`Email API error: ${emailResponse.status} - ${errorData.error || 'Unknown error'}`);
+      }
+
+      const emailResult = await emailResponse.json();
+      console.log('✅ Voucher email sent to recipient:', emailResult);
+    } catch (emailError: any) {
+      console.error('❌ Error sending voucher email:', emailError.message || emailError);
+      // Don't throw - continue with voucher creation even if email fails
     }
 
     // Send confirmation email to purchaser
     if (purchaserEmail) {
       try {
-        await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://zentrabooking.com'}/api/email/send-voucher-confirmation`, {
+        const confirmationUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://zentrabooking.com'}/api/email/send-voucher-confirmation`;
+        console.log('📧 Sending confirmation email to:', purchaserEmail);
+        console.log('📧 Confirmation endpoint:', confirmationUrl);
+        
+        const confirmationResponse = await fetch(confirmationUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -109,9 +123,18 @@ export async function POST(request: NextRequest) {
             purchaserEmail: purchaserEmail || '',
           }),
         });
-        console.log('✅ Confirmation email sent to purchaser');
-      } catch (emailError) {
-        console.error('❌ Error sending confirmation email:', emailError);
+
+        if (!confirmationResponse.ok) {
+          const errorData = await confirmationResponse.json().catch(() => ({ error: 'Unknown error' }));
+          console.error('❌ Confirmation email API returned error:', confirmationResponse.status, errorData);
+          throw new Error(`Confirmation email API error: ${confirmationResponse.status} - ${errorData.error || 'Unknown error'}`);
+        }
+
+        const confirmationResult = await confirmationResponse.json();
+        console.log('✅ Confirmation email sent to purchaser:', confirmationResult);
+      } catch (emailError: any) {
+        console.error('❌ Error sending confirmation email:', emailError.message || emailError);
+        // Don't throw - continue with voucher creation even if email fails
       }
     }
 

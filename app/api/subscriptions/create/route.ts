@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { db } from '@/lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { getStripeKey } from '@/lib/stripe-config';
 
-const stripe = new Stripe(getStripeKey(), {
-  apiVersion: '2025-09-30.clover',
-});
+// Initialize Stripe lazily to avoid build-time errors
+const getStripe = () => {
+  const key = getStripeKey();
+  if (!key) {
+    throw new Error('STRIPE_SECRET_KEY is not configured');
+  }
+  return new Stripe(key, {
+    apiVersion: '2025-09-30.clover',
+  });
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,6 +24,39 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required fields: businessId and planId are required' },
         { status: 400 }
       );
+    }
+
+    // Check if user already has an active subscription - if so, use update endpoint instead
+    try {
+      const businessDoc = await getDoc(doc(db, 'businesses', businessId));
+      if (businessDoc.exists()) {
+        const businessData = businessDoc.data();
+        const existingCustomerId = businessData?.stripeCustomerId || customerId;
+        
+        if (existingCustomerId) {
+          const stripe = getStripe();
+          const existingSubscriptions = await stripe.subscriptions.list({
+            customer: existingCustomerId,
+            status: 'active',
+            limit: 1,
+          });
+
+          if (existingSubscriptions.data.length > 0) {
+            // User has an active subscription - redirect to update endpoint
+            return NextResponse.json(
+              { 
+                error: 'You already have an active subscription. Please use the update endpoint to change plans.',
+                redirectToUpdate: true,
+                message: 'To change your plan, the system will update your existing subscription instead of creating a new one.'
+              },
+              { status: 400 }
+            );
+          }
+        }
+      }
+    } catch (checkError) {
+      // If check fails, continue with creating new subscription
+      console.warn('Could not check for existing subscription, proceeding with new subscription:', checkError);
     }
 
     // Define subscription plans
@@ -53,6 +93,7 @@ export async function POST(request: NextRequest) {
     let stripeCustomerId = customerId;
     if (!stripeCustomerId) {
       // Create a new customer for this business
+      const stripe = getStripe();
       const customer = await stripe.customers.create({
         metadata: {
           businessId: businessId,
@@ -62,11 +103,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Create Stripe Checkout Session
-    // If we have a valid price ID, use it, otherwise create price on the fly
+    // If we have a valid price ID, verify it exists, otherwise create price on the fly
     const lineItems: any[] = [];
+    const stripe = getStripe();
     
+    let usePriceId = false;
     if (selectedPlan.priceId && selectedPlan.priceId.startsWith('price_')) {
-      // Use existing price ID if available
+      // Verify the price ID exists in Stripe before using it
+      try {
+        await stripe.prices.retrieve(selectedPlan.priceId);
+        usePriceId = true;
+      } catch (priceError: any) {
+        console.warn(`Price ID ${selectedPlan.priceId} not found in Stripe, creating price on the fly:`, priceError.message);
+        usePriceId = false;
+      }
+    }
+    
+    if (usePriceId) {
+      // Use existing price ID if available and valid
       lineItems.push({
         price: selectedPlan.priceId,
         quantity: 1,
@@ -89,13 +143,22 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    console.log('Creating Stripe Checkout Session:', {
+      customer: stripeCustomerId,
+      planId: planId,
+      planName: selectedPlan.name,
+      usePriceId: usePriceId,
+      priceId: selectedPlan.priceId,
+      lineItems: lineItems
+    });
+
     const session = await stripe.checkout.sessions.create({
       customer: stripeCustomerId,
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'subscription',
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://zentrabooking.com'}/dashboard/subscription?success=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://zentrabooking.com'}/dashboard/subscription?canceled=true`,
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://zentrabooking.com'}/subscription?success=true`,
+      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://zentrabooking.com'}/subscription?canceled=true`,
       subscription_data: {
         metadata: {
           businessId: businessId,
@@ -109,6 +172,13 @@ export async function POST(request: NextRequest) {
       },
       // Set currency to GBP
       currency: 'gbp',
+    });
+
+    console.log('Checkout Session created:', {
+      sessionId: session.id,
+      url: session.url,
+      mode: session.mode,
+      customer: session.customer
     });
 
     // Store customer ID and end trial in Firestore

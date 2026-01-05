@@ -1,10 +1,17 @@
 import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
 import { generateBookingConfirmationEmail, generatePaymentLinkEmail, generateRescheduleConfirmationEmail, generateVoucherEmail } from '@/lib/emailTemplates';
+import { adminDb } from '@/lib/firebase-admin';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Initialize Resend lazily to avoid build-time errors
+const getResend = () => {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY is not configured');
+  }
+  return new Resend(process.env.RESEND_API_KEY);
+};
 
 export async function POST(request: Request) {
   try {
@@ -22,12 +29,36 @@ export async function POST(request: Request) {
     }
 
     // Fetch business settings for branding
-    let businessSettings = {};
+    let businessSettings: any = {};
     if (businessId) {
       try {
-        const businessDoc = await getDoc(doc(db, 'businesses', businessId));
-        if (businessDoc.exists()) {
-          const businessData = businessDoc.data();
+        // Use Firebase Admin SDK for server-side operations, fallback to client SDK
+        let businessData = null;
+        if (adminDb) {
+          try {
+            const businessDoc = await adminDb.collection('businesses').doc(businessId).get();
+            if (businessDoc.exists) {
+              businessData = businessDoc.data();
+            }
+          } catch (adminError: any) {
+            console.error('❌ Firebase Admin error (will try client SDK):', adminError.message);
+            // Fall through to try client SDK
+          }
+        }
+        
+        // Try client SDK if admin failed or not available
+        if (!businessData && db) {
+          try {
+            const businessDoc = await getDoc(doc(db, 'businesses', businessId));
+            if (businessDoc.exists()) {
+              businessData = businessDoc.data();
+            }
+          } catch (clientError: any) {
+            console.error('❌ Firebase client SDK error:', clientError.message);
+          }
+        }
+        
+        if (businessData) {
           businessSettings = {
             logo: businessData.emailSettings?.logo || businessData.logo,
             signature: businessData.emailSettings?.signature,
@@ -36,12 +67,16 @@ export async function POST(request: Request) {
             businessPhone: businessData.phone,
             businessEmail: businessData.email,
             businessAddress: businessData.address,
-            colorScheme: businessData.colorScheme || 'classic'
+            colorScheme: businessData.colorScheme || 'classic',
+            loyaltyProgram: businessData.loyaltyProgram || {}
           };
+        } else {
+          console.warn('⚠️ Business data not found, using defaults');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('❌ Error fetching business settings:', error);
-        // Continue with default settings
+        console.error('❌ Error details:', error.message);
+        // Continue with default settings - don't fail email sending
       }
     }
 
@@ -95,6 +130,15 @@ export async function POST(request: Request) {
     console.log('📧 HTML length:', emailHtml?.length);
     console.log('📧 Resend API Key exists:', !!process.env.RESEND_API_KEY);
     
+    // Validate Resend API key
+    if (!process.env.RESEND_API_KEY) {
+      console.error('❌ RESEND_API_KEY is not set in environment variables');
+      return NextResponse.json(
+        { error: 'Email service not configured. Please contact support.' },
+        { status: 500 }
+      );
+    }
+    
     // Check if email is unsubscribed
     const unsubscribedEmails = (businessSettings as any)?.unsubscribedEmails || [];
     if (unsubscribedEmails.includes(to)) {
@@ -109,30 +153,40 @@ export async function POST(request: Request) {
     const businessName = (businessSettings as any)?.businessName || (businessSettings as any)?.name || 'Your Business';
     const businessEmail = (businessSettings as any)?.email || 'noreply@mail.zentrabooking.com';
     
-    const result = await resend.emails.send({
-      from: `${businessName} <noreply@mail.zentrabooking.com>`,
-      to: [to],
-      subject: subject,
-      html: emailHtml,
-      replyTo: businessEmail, // Use business email as reply-to
-      headers: {
-        'X-Mailer': 'Zentra Booking System',
-        'X-Priority': '3',
-      },
-    });
+    try {
+      const resend = getResend();
+      const result = await resend.emails.send({
+        from: `${businessName} <noreply@mail.zentrabooking.com>`,
+        to: [to],
+        subject: subject,
+        html: emailHtml,
+        replyTo: businessEmail, // Use business email as reply-to
+        headers: {
+          'X-Mailer': 'Zentra Booking System',
+          'X-Priority': '3',
+        },
+      });
 
-    console.log('✅ Resend response:', JSON.stringify(result, null, 2));
+      console.log('✅ Resend response:', JSON.stringify(result, null, 2));
 
-    // Check if there's an error in the response
-    if (result.error) {
-      console.error('❌ Resend returned an error:', result.error);
-      return NextResponse.json({ 
-        success: false, 
-        error: result.error 
-      }, { status: 500 });
+      // Check if there's an error in the response
+      if (result.error) {
+        console.error('❌ Resend returned an error:', result.error);
+        return NextResponse.json({ 
+          success: false, 
+          error: result.error 
+        }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, data: result.data });
+    } catch (resendError: any) {
+      console.error('❌ Resend API error:', resendError);
+      console.error('❌ Resend error details:', resendError.message, resendError.response?.data);
+      return NextResponse.json(
+        { error: resendError.message || 'Failed to send email via Resend' },
+        { status: 500 }
+      );
     }
-
-    return NextResponse.json({ success: true, data: result.data });
   } catch (error: any) {
     console.error('❌ Error sending email:', error);
     console.error('Error details:', error.message, error.response?.data);

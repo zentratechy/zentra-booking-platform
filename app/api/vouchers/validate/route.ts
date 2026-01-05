@@ -32,6 +32,18 @@ export async function POST(request: NextRequest) {
     const voucher = vouchersSnapshot.docs[0].data();
     const voucherId = vouchersSnapshot.docs[0].id;
 
+    // Check if business has voucher system enabled
+    const businessDoc = await getDoc(doc(db, 'businesses', businessId));
+    if (businessDoc.exists()) {
+      const businessData = businessDoc.data();
+      if (!businessData.voucherSystem?.active) {
+        return NextResponse.json(
+          { error: 'Voucher system is not enabled for this business' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Check if voucher is active
     if (voucher.status !== 'active' || voucher.redeemed) {
       return NextResponse.json(

@@ -48,7 +48,7 @@ export default function SubscriptionGuard({
             }
           </p>
           <Link
-            href="/dashboard/subscription"
+            href="/subscription"
             className="inline-flex items-center px-4 py-2 bg-gold text-white rounded-lg hover:bg-gold/90 transition-colors"
           >
             {trialStatus?.active ? 'Subscribe Now' : 'Upgrade Now'}

@@ -257,7 +257,7 @@ export default function FormsPage() {
     return (
       <div className="min-h-screen bg-soft-cream">
         <DashboardSidebar />
-        <div className="ml-64 min-h-screen flex items-center justify-center">
+        <div className="lg:ml-64 min-h-screen flex items-center justify-center">
           <div className="text-center">
             <div className="w-8 h-8 border-4 border-gray-300 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-gray-600">Loading forms...</p>
@@ -270,7 +270,7 @@ export default function FormsPage() {
   return (
     <div className="min-h-screen bg-soft-cream">
       <DashboardSidebar />
-      <div className="ml-64 min-h-screen">
+      <div className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">

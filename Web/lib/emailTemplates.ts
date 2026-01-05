@@ -1,45 +1,145 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateEmailTemplate = generateEmailTemplate;
-exports.generateBookingConfirmationEmail = generateBookingConfirmationEmail;
-exports.generatePaymentLinkEmail = generatePaymentLinkEmail;
-exports.generateRescheduleConfirmationEmail = generateRescheduleConfirmationEmail;
-exports.generateVoucherEmail = generateVoucherEmail;
-exports.generateDailyReminderEmail = generateDailyReminderEmail;
-exports.generateVoucherConfirmationEmail = generateVoucherConfirmationEmail;
-exports.generateBirthdayBonusEmail = generateBirthdayBonusEmail;
-const colorSchemes_1 = require("./colorSchemes");
+import { getColorScheme } from './colorSchemes';
+
+export interface BusinessEmailSettings {
+  logo?: string;
+  signature?: string;
+  footerText?: string;
+  businessName?: string;
+  businessPhone?: string;
+  businessEmail?: string;
+  businessAddress?: string;
+  colorScheme?: string;
+}
+
+export interface AppointmentData {
+  customerName: string;
+  clientId?: string; // Client ID for referral links
+  serviceName: string;
+  staffName: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  locationName: string;
+  businessName: string;
+  businessPhone?: string;
+  businessEmail?: string;
+  businessAddress?: string;
+  totalPrice?: number;
+  currency?: string;
+  notes?: string;
+  appointmentId?: string;
+  businessId?: string;
+}
+
+export interface PaymentData {
+  customerName: string;
+  clientId?: string; // Client ID for referral links
+  amount: number;
+  currency: string;
+  paymentLink: string;
+  businessName: string;
+  businessId?: string; // Business ID for referral links
+  businessPhone?: string;
+  businessEmail?: string;
+  businessAddress?: string;
+  serviceName?: string;
+  appointmentDate?: string;
+  appointmentTime?: string;
+}
+
+export interface VoucherData {
+  recipientName: string;
+  voucherCode: string;
+  voucherValue: number;
+  currency: string;
+  message?: string;
+  purchaserName?: string;
+  expiryDate?: string;
+  businessName: string;
+  businessPhone?: string;
+  businessEmail?: string;
+  businessAddress?: string;
+}
+
+export interface DailyReminderData {
+  businessName: string;
+  tomorrowDate: Date;
+  appointments: any[];
+  currency: string;
+  totalRevenue: number;
+}
+
 // Helper function to format currency
-const formatPrice = (amount, currency = 'GBP') => {
-    return new Intl.NumberFormat('en-GB', {
-        style: 'currency',
-        currency: currency.toUpperCase(),
-    }).format(amount);
+const formatPrice = (amount: number, currency: string = 'GBP') => {
+  return new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: currency.toUpperCase(),
+  }).format(amount);
 };
+
 // Helper function to format date
-const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-GB', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('en-GB', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
 };
+
 // Helper function to format expiry date
-const formatExpiryDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-GB', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
+const formatExpiryDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('en-GB', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
 };
+
 // Generate email template with business branding
-function generateEmailTemplate(title, content, businessSettings, appointmentData) {
+export function generateEmailTemplate(
+  title: string,
+  content: string,
+  businessSettings: BusinessEmailSettings,
+  appointmentData?: AppointmentData | any // Allow any data type to extract clientId/businessId
+) {
+  // Ensure businessSettings is always an object
+  const safeBusinessSettings = (businessSettings && typeof businessSettings === 'object') ? businessSettings : {};
+  
+  const colorScheme = getColorScheme(safeBusinessSettings.colorScheme || 'classic');
+  
   // Get base URL from environment (for referral links)
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://zentrabooking.com';
-    const colorScheme = (0, colorSchemes_1.getColorScheme)(businessSettings.colorScheme || 'classic');
-    return `
+  
+  // Extract clientId and businessId from any data structure
+  const clientId = appointmentData?.clientId || (appointmentData as any)?.clientId;
+  const businessId = appointmentData?.businessId || (appointmentData as any)?.businessId;
+  // Respect referral toggle in business settings - safely handle missing loyaltyProgram
+  const loyaltyProgram = (safeBusinessSettings as any)?.loyaltyProgram;
+  // Ensure we have a safe object to access - handle null, undefined, or missing loyaltyProgram
+  // Note: typeof null === 'object' in JavaScript, so we must explicitly check for null
+  const safeLoyaltyProgram = (loyaltyProgram && typeof loyaltyProgram === 'object' && loyaltyProgram !== null) ? loyaltyProgram : {};
+  const safeSettings = safeLoyaltyProgram?.settings || {};
+  const referralEnabled = safeSettings?.referral?.enabled ??
+                          safeSettings?.referralEnabled ??
+                          true; // Default to enabled if loyaltyProgram doesn't exist or is missing settings
+  const referralUrl = referralEnabled && (typeof businessId === 'string' && typeof clientId === 'string' && businessId && clientId)
+    ? `${baseUrl}/book/${businessId}?ref=${clientId}`
+    : '';
+  
+  // Log for debugging (only in dev)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('📧 Email template - data:', {
+      businessId,
+      clientId,
+      baseUrl,
+      hasBusinessId: !!businessId,
+      hasClientId: !!clientId,
+      dataType: appointmentData ? Object.keys(appointmentData).join(', ') : 'none'
+    });
+  }
+  
+  return `
     <!DOCTYPE html>
     <html>
     <head>
@@ -252,9 +352,10 @@ function generateEmailTemplate(title, content, businessSettings, appointmentData
       <div class="container">
         <div class="header">
           <div class="header-content">
-            ${businessSettings.logo ?
-        `<img src="${businessSettings.logo}" alt="${businessSettings.businessName || 'Business'}" class="logo">` :
-        `<div style="font-size: 28px; font-weight: 700; margin-bottom: 10px;">${businessSettings.businessName || 'Your Business'}</div>`}
+            ${safeBusinessSettings.logo ? 
+              `<img src="${safeBusinessSettings.logo}" alt="${safeBusinessSettings.businessName || 'Business'}" class="logo">` : 
+              `<div style="font-size: 28px; font-weight: 700; margin-bottom: 10px;">${safeBusinessSettings.businessName || 'Your Business'}</div>`
+            }
             <h1>${title}</h1>
           </div>
         </div>
@@ -266,24 +367,32 @@ function generateEmailTemplate(title, content, businessSettings, appointmentData
         <div class="footer">
           <div class="signature">
             <div class="signature-content">
-              ${businessSettings.signature || `Best regards,<br><strong>${businessSettings.businessName || 'Your Business'}</strong>`}
+              ${safeBusinessSettings.signature || `Best regards,<br><strong>${safeBusinessSettings.businessName || 'Your Business'}</strong>`}
             </div>
           </div>
           
-          ${businessSettings.footerText ? `
+          ${safeBusinessSettings.footerText ? `
             <div class="footer-text">
-              <div class="footer-text-content">${businessSettings.footerText}</div>
+              <div class="footer-text-content">${safeBusinessSettings.footerText}</div>
             </div>
           ` : ''}
           
-          ${(((businessSettings === null || businessSettings === void 0 ? void 0 : businessSettings.loyaltyProgram) === null || businessSettings === void 0 ? void 0 : businessSettings.loyaltyProgram.settings) && (((businessSettings === null || businessSettings === void 0 ? void 0 : businessSettings.loyaltyProgram.settings.referral) && (businessSettings === null || businessSettings === void 0 ? void 0 : businessSettings.loyaltyProgram.settings.referral.enabled)) || (businessSettings === null || businessSettings === void 0 ? void 0 : businessSettings.loyaltyProgram.settings.referralEnabled) === true || (businessSettings === null || businessSettings === void 0 ? void 0 : businessSettings.loyaltyProgram.settings.referralEnabled) === undefined) && (appointmentData === null || appointmentData === void 0 ? void 0 : appointmentData.businessId) && (appointmentData === null || appointmentData === void 0 ? void 0 : appointmentData.clientId) && ((appointmentData === null || appointmentData === void 0 ? void 0 : appointmentData.templateHint) !== 'payment')) ? `
+          <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.2); font-size: 12px; opacity: 0.8;">
+            <p style="margin: 0 0 8px 0;">You received this email because you have an appointment with ${safeBusinessSettings.businessName || 'our business'}.</p>
+            <p style="margin: 0;">
+              <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/unsubscribe?email=${encodeURIComponent((appointmentData as any)?.clientEmail || '')}&business=${appointmentData?.businessId || ''}" 
+                 style="color: #ffffff; text-decoration: underline;">Unsubscribe from these emails</a>
+            </p>
+          </div>
+          
+          ${referralUrl && (appointmentData as any)?.templateHint !== 'payment' ? `
           <div style="margin: 25px 0; padding: 20px; background: rgba(255,255,255,0.1); border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);">
             <h3 style="color: #ffffff; font-size: 16px; margin: 0 0 15px 0; font-weight: 600;">💝 Refer a Friend & Earn Rewards!</h3>
             <p style="color: #ffffff; font-size: 14px; margin: 0 0 15px 0; line-height: 1.6;">
               Love our service? Refer a friend and you'll both earn bonus loyalty points when they book their first appointment!
             </p>
             <div style="text-align: center;">
-              <a href="${baseUrl}/book/${appointmentData.businessId}?ref=${appointmentData.clientId}" 
+              <a href="${referralUrl}" 
                  style="display: inline-block; background: rgba(255,255,255,0.2); color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; border: 1px solid rgba(255,255,255,0.3); transition: all 0.3s ease;">
                 📱 Share Booking Link
               </a>
@@ -293,6 +402,8 @@ function generateEmailTemplate(title, content, businessSettings, appointmentData
             </p>
           </div>
           ` : ''}
+          ${(appointmentData as any)?.templateHint === 'payment' ? `<!-- template referral block skipped for payment -->` : ''}
+          <!-- referral: ${referralEnabled ? 'enabled' : 'disabled'}; source: template; hasUrl:${!!referralUrl} -->
           
           <div class="small">
             This is an automated email. Please do not reply to this message.
@@ -303,10 +414,15 @@ function generateEmailTemplate(title, content, businessSettings, appointmentData
     </html>
   `;
 }
+
 // Generate booking confirmation email
-function generateBookingConfirmationEmail(appointmentData, businessSettings = {}) {
-    const colorScheme = (0, colorSchemes_1.getColorScheme)(businessSettings.colorScheme || 'classic');
-    const content = `
+export function generateBookingConfirmationEmail(
+  appointmentData: AppointmentData,
+  businessSettings: BusinessEmailSettings = {}
+) {
+  const colorScheme = getColorScheme(businessSettings.colorScheme || 'classic');
+  
+  const content = `
     <p style="font-size: 16px; margin-bottom: 30px; color: #333333;">
       Dear <strong>${appointmentData.customerName}</strong>,
     </p>
@@ -358,9 +474,9 @@ function generateBookingConfirmationEmail(appointmentData, businessSettings = {}
       </div>
     </div>
     
-    ${appointmentData.businessId && appointmentData.clientEmail ? `
+    ${appointmentData.businessId && (appointmentData as any).clientEmail ? `
     <div style="text-align: center; margin: 35px 0;">
-      <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://zentrabooking.com'}/my-bookings?email=${encodeURIComponent(appointmentData.clientEmail || '')}&businessId=${appointmentData.businessId}" 
+      <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://zentrabooking.com'}/my-bookings?email=${encodeURIComponent((appointmentData as any).clientEmail || '')}&businessId=${appointmentData.businessId}" 
          style="display: inline-block; background: ${colorScheme.colors.primary}; color: white; padding: 14px 32px; text-decoration: none; border-radius: 4px; font-weight: 500; font-size: 15px;">
         Manage Booking
       </a>
@@ -375,13 +491,18 @@ function generateBookingConfirmationEmail(appointmentData, businessSettings = {}
       We look forward to seeing you.
     </p>
   `;
-    return generateEmailTemplate('Appointment Confirmed', content, businessSettings, appointmentData);
+
+  return generateEmailTemplate('Appointment Confirmed', content, businessSettings, appointmentData);
 }
+
 // Generate payment link email
-function generatePaymentLinkEmail(paymentData, businessSettings = {}) {
-    const content = `
+export function generatePaymentLinkEmail(
+  paymentData: PaymentData,
+  businessSettings: BusinessEmailSettings = {}
+) {
+  const content = `
     <p style="font-size: 18px; margin-bottom: 25px; font-family: Georgia, serif;">
-      Dear <strong style="color: #8b7355;">${paymentData.customerName}</strong>,
+      Dear <strong style="color: #8b7355;">${paymentData.customerName || (paymentData as any).clientName || 'Customer'}</strong>,
     </p>
     
     <div class="divider"></div>
@@ -429,11 +550,17 @@ function generatePaymentLinkEmail(paymentData, businessSettings = {}) {
       This secure payment link will expire in 7 days. For any inquiries, we are at your service.
     </p>
   `;
-    return generateEmailTemplate('Payment Required', content, businessSettings);
+
+  // Pass paymentData to template so it can extract clientId/businessId for referral link
+  return generateEmailTemplate('Payment Required', content, businessSettings, paymentData);
 }
+
 // Generate reschedule confirmation email
-function generateRescheduleConfirmationEmail(appointmentDetails, businessSettings = {}) {
-    const content = `
+export function generateRescheduleConfirmationEmail(
+  appointmentDetails: any,
+  businessSettings: BusinessEmailSettings = {}
+) {
+  const content = `
     <p style="font-size: 18px; margin-bottom: 25px; font-family: Georgia, serif;">
       Dear <strong style="color: #8b7355;">${appointmentDetails.customerName || appointmentDetails.clientName || 'Valued Guest'}</strong>,
     </p>
@@ -483,11 +610,17 @@ function generateRescheduleConfirmationEmail(appointmentDetails, businessSetting
       Should you need any further assistance, please do not hesitate to contact us.
     </p>
   `;
-    return generateEmailTemplate('Appointment Rescheduled', content, businessSettings);
+
+  // Pass appointmentDetails to template so it can extract clientId/businessId for referral link
+  return generateEmailTemplate('Appointment Rescheduled', content, businessSettings, appointmentDetails);
 }
+
 // Generate voucher email
-function generateVoucherEmail(voucherData, businessSettings = {}) {
-    const content = `
+export function generateVoucherEmail(
+  voucherData: VoucherData,
+  businessSettings: BusinessEmailSettings = {}
+) {
+  const content = `
     <p style="font-size: 18px; margin-bottom: 25px; font-family: Georgia, serif;">
       Dear <strong style="color: #8b7355;">${voucherData.recipientName}</strong>,
     </p>
@@ -512,7 +645,7 @@ function generateVoucherEmail(voucherData, businessSettings = {}) {
     </div>
 
     ${voucherData.message ? `
-    <div style="background: linear-gradient(135deg, ${businessSettings.colorScheme ? (0, colorSchemes_1.getColorScheme)(businessSettings.colorScheme).colors.primary : '#8B7355'} 0%, ${businessSettings.colorScheme ? (0, colorSchemes_1.getColorScheme)(businessSettings.colorScheme).colors.secondary : '#A8B5A0'} 100%); color: white; padding: 35px; border-radius: 0; margin: 35px 0; font-style: italic; font-size: 18px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.15); border-top: 3px solid #d4af37; border-bottom: 3px solid #d4af37;">
+    <div style="background: linear-gradient(135deg, ${businessSettings.colorScheme ? getColorScheme(businessSettings.colorScheme).colors.primary : '#8B7355'} 0%, ${businessSettings.colorScheme ? getColorScheme(businessSettings.colorScheme).colors.secondary : '#A8B5A0'} 100%); color: white; padding: 35px; border-radius: 0; margin: 35px 0; font-style: italic; font-size: 18px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.15); border-top: 3px solid #d4af37; border-bottom: 3px solid #d4af37;">
       <div style="font-size: 12px; margin-bottom: 15px; opacity: 0.9; letter-spacing: 2px; text-transform: uppercase; font-weight: 300;">A Personal Message</div>
       <div style="font-family: Georgia, serif; font-size: 20px; font-weight: 300; line-height: 1.8;">"${voucherData.message}"</div>
     </div>
@@ -565,12 +698,18 @@ function generateVoucherEmail(voucherData, businessSettings = {}) {
       We are delighted to welcome you and look forward to providing exceptional service.
     </p>
   `;
-    return generateEmailTemplate('🎁 Gift Voucher', content, businessSettings);
+
+  return generateEmailTemplate('🎁 Gift Voucher', content, businessSettings);
 }
+
 // Generate daily reminder email
-function generateDailyReminderEmail(reminderData, businessSettings = {}) {
-    const { businessName, tomorrowDate, appointments, currency, totalRevenue } = reminderData;
-    const content = `
+export function generateDailyReminderEmail(
+  reminderData: DailyReminderData,
+  businessSettings: BusinessEmailSettings = {}
+) {
+  const { businessName, tomorrowDate, appointments, currency, totalRevenue } = reminderData;
+  
+  const content = `
     <p style="font-size: 18px; margin-bottom: 25px; font-family: Georgia, serif; color: #2c2c2c;">
       Good day,
     </p>
@@ -619,18 +758,15 @@ function generateDailyReminderEmail(reminderData, businessSettings = {}) {
             </tr>
           </thead>
           <tbody>
-            ${appointments.map((apt) => {
-        var _a;
-        return `
+            ${appointments.map((apt: any) => `
               <tr style="border-bottom: 1px dashed #e8e3dc;">
                 <td style="padding: 18px 15px; font-weight: 400; color: #2c2c2c; font-family: Georgia, serif;">${apt.time}</td>
                 <td style="padding: 18px 15px; color: #4a4a4a;">${apt.clientName}</td>
                 <td style="padding: 18px 15px; color: #4a4a4a;">${apt.serviceName}</td>
                 <td style="padding: 18px 15px; color: #4a4a4a;">${apt.staffName}</td>
-                <td style="padding: 18px 15px; font-weight: 400; color: #2c2c2c;">${formatPrice(((_a = apt.payment) === null || _a === void 0 ? void 0 : _a.price) || 0, currency)}</td>
+                <td style="padding: 18px 15px; font-weight: 400; color: #2c2c2c;">${formatPrice(apt.payment?.price || 0, currency)}</td>
               </tr>
-            `;
-    }).join('')}
+            `).join('')}
           </tbody>
         </table>
       </div>
@@ -643,15 +779,110 @@ function generateDailyReminderEmail(reminderData, businessSettings = {}) {
       Please ensure all preparations are complete for tomorrow's appointments.
     </p>
   `;
-    return generateEmailTemplate('Tomorrow\'s Schedule', content, businessSettings);
+
+  return generateEmailTemplate('Tomorrow\'s Schedule', content, businessSettings);
 }
-function generateVoucherConfirmationEmail(confirmationData, businessSettings) {
-    const colorScheme = (0, colorSchemes_1.getColorScheme)(businessSettings.colorScheme || 'classic');
-    const formatPrice = (amount, currency) => {
-        const symbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '$';
-        return `${symbol}${amount.toFixed(2)}`;
-    };
-    const content = `
+
+// Generate appointment reminder email
+export function generateAppointmentReminderEmail(
+  appointmentData: AppointmentData,
+  businessSettings: BusinessEmailSettings = {},
+  daysBefore: number = 1
+) {
+  const colorScheme = getColorScheme(businessSettings.colorScheme || 'classic');
+  
+  const reminderText = daysBefore === 1 
+    ? 'tomorrow' 
+    : daysBefore === 7 
+      ? 'in one week' 
+      : `in ${daysBefore} days`;
+
+  const content = `
+    <p style="font-size: 18px; margin-bottom: 25px; font-family: Georgia, serif;">
+      Dear <strong style="color: #8b7355;">${appointmentData.customerName}</strong>,
+    </p>
+    
+    <div class="divider"></div>
+    
+    <p style="font-size: 16px; margin-bottom: 25px; font-style: italic; text-align: center; color: #8b7355;">
+      This is a friendly reminder that you have an upcoming appointment ${reminderText}.
+    </p>
+
+    <div class="appointment-card">
+      <div style="text-align: center; margin-bottom: 25px;">
+        <div style="font-size: 12px; color: #8b7355; margin-bottom: 15px; letter-spacing: 3px; font-weight: 300; text-transform: uppercase;">Your Appointment</div>
+        <div style="font-size: 26px; font-weight: 300; color: #2c2c2c; margin-bottom: 12px; font-family: Georgia, serif;">
+          ${appointmentData.appointmentDate}
+        </div>
+        <div style="font-size: 18px; color: #8b7355; font-weight: 300;">
+          ${appointmentData.appointmentTime}
+        </div>
+      </div>
+    </div>
+
+    <div class="appointment-details">
+      <div class="detail-row">
+        <div class="detail-label">Service</div>
+        <div class="detail-value">${appointmentData.serviceName}</div>
+      </div>
+      ${appointmentData.staffName ? `
+      <div class="detail-row">
+        <div class="detail-label">Staff Member</div>
+        <div class="detail-value">${appointmentData.staffName}</div>
+      </div>
+      ` : ''}
+      ${appointmentData.locationName ? `
+      <div class="detail-row">
+        <div class="detail-label">Location</div>
+        <div class="detail-value">${appointmentData.locationName}</div>
+      </div>
+      ` : ''}
+      ${(appointmentData as any).price || appointmentData.totalPrice ? `
+      <div class="detail-row">
+        <div class="detail-label">Price</div>
+        <div class="detail-value">${formatPrice((appointmentData as any).price || appointmentData.totalPrice || 0, appointmentData.currency || 'GBP')}</div>
+      </div>
+      ` : ''}
+      ${appointmentData.notes ? `
+      <div class="detail-row">
+        <div class="detail-label">Notes</div>
+        <div class="detail-value">${appointmentData.notes}</div>
+      </div>
+      ` : ''}
+    </div>
+
+    ${appointmentData.businessId ? `
+    <div style="text-align: center; margin: 35px 0;">
+      <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'https://zentrabooking.com'}/my-bookings?businessId=${appointmentData.businessId}" 
+         class="cta-button">
+        View or Manage Booking
+      </a>
+    </div>
+    ` : ''}
+
+    <div class="divider"></div>
+
+    <p style="font-size: 15px; color: #8b7355; margin-top: 35px; text-align: center; font-style: italic;">
+      We look forward to seeing you ${reminderText === 'tomorrow' ? 'tomorrow' : 'soon'}!
+    </p>
+    
+    <p style="font-size: 14px; color: #666666; margin-top: 25px; text-align: center; line-height: 1.8;">
+      If you need to reschedule or cancel, please contact us as soon as possible.
+    </p>
+  `;
+
+  return generateEmailTemplate('Appointment Reminder', content, businessSettings, appointmentData);
+}
+
+export function generateVoucherConfirmationEmail(confirmationData: any, businessSettings: BusinessEmailSettings) {
+  const colorScheme = getColorScheme(businessSettings.colorScheme || 'classic');
+  
+  const formatPrice = (amount: number, currency: string) => {
+    const symbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '$';
+    return `${symbol}${amount.toFixed(2)}`;
+  };
+
+  const content = `
     <div style="text-align: center; margin-bottom: 30px;">
       <h1 style="color: ${colorScheme.colors.primary}; font-size: 28px; margin: 0 0 10px 0; font-weight: 600;">
         🎁 Gift Voucher Purchase Confirmed!
@@ -711,11 +942,14 @@ function generateVoucherConfirmationEmail(confirmationData, businessSettings) {
       </p>
     </div>
   `;
-    return generateEmailTemplate('Gift Voucher Purchase Confirmation', content, businessSettings);
+
+  return generateEmailTemplate('Gift Voucher Purchase Confirmation', content, businessSettings);
 }
-function generateBirthdayBonusEmail(bonusData, businessSettings) {
-    const colorScheme = (0, colorSchemes_1.getColorScheme)(businessSettings.colorScheme || 'classic');
-    const content = `
+
+export function generateBirthdayBonusEmail(bonusData: any, businessSettings: BusinessEmailSettings) {
+  const colorScheme = getColorScheme(businessSettings.colorScheme || 'classic');
+  
+  const content = `
     <div style="text-align: center; margin-bottom: 30px;">
       <h1 style="color: ${colorScheme.colors.primary}; font-size: 28px; margin: 0 0 10px 0; font-weight: 600;">
         🎂 Happy Birthday!
@@ -757,6 +991,6 @@ function generateBirthdayBonusEmail(bonusData, businessSettings) {
       </p>
     </div>
   `;
-    return generateEmailTemplate('Happy Birthday!', content, businessSettings);
+
+  return generateEmailTemplate('Happy Birthday!', content, businessSettings);
 }
-//# sourceMappingURL=emailTemplates.js.map

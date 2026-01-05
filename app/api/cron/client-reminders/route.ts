@@ -4,7 +4,13 @@ import { collection, query, where, getDocs, doc, updateDoc, Timestamp } from 'fi
 import { db } from '@/lib/firebase';
 import { generateEmailTemplate } from '@/lib/emailTemplates';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Initialize Resend lazily to avoid build-time errors
+const getResend = () => {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY is not configured');
+  }
+  return new Resend(process.env.RESEND_API_KEY);
+};
 
 export async function GET(request: Request) {
   try {
@@ -298,6 +304,7 @@ export async function GET(request: Request) {
             const emailHtml = generateEmailTemplate('Appointment Reminder', content, businessSettings, appointmentData);
 
             // Send email
+            const resend = getResend();
             const { data: emailData, error: emailError } = await resend.emails.send({
               from: `${businessSettings.businessName || 'Zentra'} <noreply@mail.zentrabooking.com>`,
               replyTo: businessSettings.businessEmail || 'support@mail.zentrabooking.com',

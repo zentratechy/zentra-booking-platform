@@ -54,7 +54,7 @@ export default function TrialGuard({ children, fallback }: TrialGuardProps) {
         </p>
         <div className="space-y-4">
           <Link 
-            href="/dashboard/subscription"
+            href="/subscription"
             className="inline-block bg-blue-500 text-white px-8 py-3 rounded-xl font-semibold text-lg hover:bg-blue-600 transition-colors"
           >
             Choose Your Plan

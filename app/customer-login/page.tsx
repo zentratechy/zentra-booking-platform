@@ -6,11 +6,10 @@ import { useCustomerAuth } from '../../contexts/CustomerAuthContext';
 
 export default function CustomerLoginPage() {
   const router = useRouter();
-  const { login, verifyPhone, loading } = useCustomerAuth();
+  const { login, verifyEmail, loading } = useCustomerAuth();
   const [step, setStep] = useState<'login' | 'verify'>('login');
   const [formData, setFormData] = useState({
     email: '',
-    phone: '',
     verificationCode: ''
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -20,11 +19,10 @@ export default function CustomerLoginPage() {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const email = urlParams.get('email');
-    const phone = urlParams.get('phone');
     const businessId = urlParams.get('businessId');
     
-    if (email && phone) {
-      setFormData({ email, phone, verificationCode: '' });
+    if (email) {
+      setFormData({ email, verificationCode: '' });
       setStep('verify');
       
       // Store businessId for redirect after verification
@@ -40,7 +38,7 @@ export default function CustomerLoginPage() {
     setError('');
 
     try {
-      const success = await login(formData.email, formData.phone);
+      const success = await login(formData.email);
       if (success) {
         setStep('verify');
       } else {
@@ -59,7 +57,7 @@ export default function CustomerLoginPage() {
     setError('');
 
     try {
-      const success = await verifyPhone(formData.email, formData.phone, formData.verificationCode);
+      const success = await verifyEmail(formData.email, formData.verificationCode);
       if (success) {
         // Check if we have a businessId to redirect back to booking page
         const businessId = sessionStorage.getItem('pendingBusinessId');
@@ -96,12 +94,12 @@ export default function CustomerLoginPage() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            {step === 'login' ? 'Sign in to your account' : 'Verify your phone number'}
+            {step === 'login' ? 'Sign in to your account' : 'Verify your email'}
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             {step === 'login' 
-              ? 'Enter your email and phone number to receive a verification code'
-              : 'Enter the 6-digit code sent to your phone'
+              ? 'Enter your email address to receive a verification code'
+              : 'Enter the 6-digit code sent to your email'
             }
           </p>
         </div>
@@ -120,24 +118,9 @@ export default function CustomerLoginPage() {
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  autoComplete="email"
                   className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
                   placeholder="Enter your email"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-                  Phone number
-                </label>
-                <input
-                  id="phone"
-                  name="phone"
-                  type="tel"
-                  required
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                  placeholder="Enter your phone number"
                 />
               </div>
             </>
@@ -159,7 +142,7 @@ export default function CustomerLoginPage() {
                   placeholder="Enter 6-digit code"
                 />
                 <p className="mt-1 text-sm text-gray-500">
-                  Code sent to {formData.phone}
+                  Code sent to {formData.email}
                 </p>
               </div>
             </>

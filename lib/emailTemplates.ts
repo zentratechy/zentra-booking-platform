@@ -97,6 +97,7 @@ const formatExpiryDate = (dateString: string) => {
 };
 
 // Generate email template with business branding
+// Version: 2025-12-17-v2 - Updated logo to square (70x70px) and reduced h1 to 26px
 export function generateEmailTemplate(
   title: string,
   content: string,
@@ -113,7 +114,9 @@ export function generateEmailTemplate(
   const businessId = appointmentData?.businessId || (appointmentData as any)?.businessId;
   // Respect referral toggle in business settings
   const referralEnabled = (businessSettings as any)?.loyaltyProgram?.settings?.referral?.enabled ??
-                          (businessSettings as any)?.loyaltyProgram?.settings?.referralEnabled ?? true;
+                          (businessSettings as any)?.loyaltyProgram?.settings?.referralEnabled ??
+                          (businessSettings as any)?.loyaltyProgram?.referralEnabled ??
+                          true;
   const referralUrl = referralEnabled && (typeof businessId === 'string' && typeof clientId === 'string' && businessId && clientId)
     ? `${baseUrl}/book/${businessId}?ref=${clientId}`
     : '';
@@ -184,17 +187,57 @@ export function generateEmailTemplate(
         }
         .header-content { position: relative; z-index: 1; }
         .logo {
-          max-height: 70px;
+          width: 70px !important;
+          height: 70px !important;
+          max-width: 70px !important;
+          max-height: 70px !important;
           margin-bottom: 25px;
           filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+          object-fit: cover;
+          border-radius: 4px;
+          display: block;
+          margin-left: auto;
+          margin-right: auto;
         }
         .header h1 { 
           margin: 0; 
-          font-size: 36px; 
+          font-size: 26px !important; 
           font-weight: 300; 
-          letter-spacing: 3px;
+          letter-spacing: 1px !important;
           text-transform: uppercase;
           text-shadow: 0 2px 8px rgba(0,0,0,0.15);
+          line-height: 1.3 !important;
+        }
+        .business-name {
+          font-size: 28px;
+          font-weight: 700;
+          margin-bottom: 10px;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+        }
+        @media only screen and (max-width: 600px) {
+          .header {
+            padding: 30px 20px !important;
+          }
+          .logo {
+            width: 50px !important;
+            height: 50px !important;
+            max-width: 50px !important;
+            max-height: 50px !important;
+            margin-bottom: 15px !important;
+          }
+          .header h1 {
+            font-size: 20px !important;
+            letter-spacing: 1.5px !important;
+            line-height: 1.3 !important;
+          }
+          .business-name {
+            font-size: 20px !important;
+            margin-bottom: 8px !important;
+          }
+          .header p {
+            font-size: 14px !important;
+          }
         }
         .header p { 
           margin: 15px 0 0; 
@@ -344,10 +387,22 @@ export function generateEmailTemplate(
         <div class="header">
           <div class="header-content">
             ${businessSettings.logo ? 
-              `<img src="${businessSettings.logo}" alt="${businessSettings.businessName || 'Business'}" class="logo">` : 
-              `<div style="font-size: 28px; font-weight: 700; margin-bottom: 10px;">${businessSettings.businessName || 'Your Business'}</div>`
+              `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 25px;">
+                <tr>
+                  <td align="center" style="padding: 0;">
+                    <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto;">
+                      <tr>
+                        <td style="width: 70px; height: 70px; padding: 0; text-align: center; vertical-align: middle; background-color: #ffffff; border-radius: 4px; overflow: hidden;">
+                          <img src="${businessSettings.logo}" alt="${businessSettings.businessName || 'Business'}" style="width: 70px; height: 70px; max-width: 70px; max-height: 70px; display: block; margin: 0; border: 0;">
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>` : 
+              `<div class="business-name" style="font-size: 28px; font-weight: 700; margin-bottom: 10px; word-wrap: break-word; overflow-wrap: break-word;">${businessSettings.businessName || 'Your Business'}</div>`
             }
-            <h1>${title}</h1>
+            <h1 style="margin: 0; font-size: 26px; font-weight: 300; letter-spacing: 1px; text-transform: uppercase; text-shadow: 0 2px 8px rgba(0,0,0,0.15); line-height: 1.3;">${title}</h1>
           </div>
         </div>
         

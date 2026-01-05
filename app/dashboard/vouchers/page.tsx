@@ -26,6 +26,8 @@ function VouchersContent() {
   const [vouchers, setVouchers] = useState<any[]>([]);
   const [currency, setCurrency] = useState('GBP');
   const [businessName, setBusinessName] = useState('');
+  const [businessData, setBusinessData] = useState<any>(null);
+  const [voucherSystemActive, setVoucherSystemActive] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'active' | 'redeemed' | 'expired'>('all');
   const [voucherData, setVoucherData] = useState({
@@ -58,6 +60,9 @@ function VouchersContent() {
         const businessData = businessSnapshot.docs[0].data();
         setCurrency(businessData.currency || 'GBP');
         setBusinessName(businessData.businessName || '');
+        setBusinessData(businessData);
+        // Check if voucher system is active (default to false)
+        setVoucherSystemActive(businessData.voucherSystem?.active ?? false);
       }
 
       // Fetch vouchers
@@ -90,7 +95,7 @@ function VouchersContent() {
 
   const handleSendVoucherEmail = async (voucher: any) => {
     try {
-      await fetch('/api/email/send-voucher', {
+      const response = await fetch('/api/email/send-voucher', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -106,16 +111,27 @@ function VouchersContent() {
           businessId: user?.uid,
         })
       });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+
       showToast('Voucher email sent successfully!', 'success');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to send voucher email:', error);
-      showToast('Failed to send voucher email', 'error');
+      showToast(`Failed to send voucher email: ${error.message || 'Unknown error'}`, 'error');
     }
   };
 
   const handleCreateVoucher = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+
+    if (!voucherSystemActive) {
+      showToast('Please enable the voucher system first', 'error');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -145,7 +161,7 @@ function VouchersContent() {
       // Send voucher email if enabled
       if (sendEmail && voucherData.recipientEmail) {
         try {
-          await fetch('/api/email/send-voucher', {
+          const response = await fetch('/api/email/send-voucher', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -161,10 +177,16 @@ function VouchersContent() {
               businessId: user?.uid,
             })
           });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || `HTTP ${response.status}`);
+          }
+
           showToast('Gift voucher created and email sent successfully!', 'success');
-        } catch (emailError) {
+        } catch (emailError: any) {
           console.error('Failed to send voucher email:', emailError);
-          showToast('Voucher created but failed to send email', 'error');
+          showToast(`Voucher created but failed to send email: ${emailError.message || 'Unknown error'}`, 'error');
         }
       } else {
         showToast('Gift voucher created successfully!', 'success');
@@ -187,6 +209,41 @@ function VouchersContent() {
       showToast('Failed to create voucher: ' + error.message, 'error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Check if payment provider is connected
+  const hasPaymentProvider = () => {
+    if (!businessData) return false;
+    const stripeConnected = businessData.paymentConfig?.stripe?.accountId;
+    const squareConnected = businessData.paymentConfig?.square?.accessToken;
+    return !!(stripeConnected || squareConnected);
+  };
+
+  const handleToggleVoucherSystem = async () => {
+    if (!user) return;
+
+    // If trying to activate, check payment provider
+    if (!voucherSystemActive && !hasPaymentProvider()) {
+      showToast('Please connect a payment provider (Stripe or Square) in Settings to enable vouchers', 'error');
+      return;
+    }
+
+    try {
+      const newStatus = !voucherSystemActive;
+      await updateDoc(doc(db, 'businesses', user.uid), {
+        'voucherSystem.active': newStatus,
+      });
+      setVoucherSystemActive(newStatus);
+      showToast(
+        newStatus 
+          ? 'Voucher system enabled' 
+          : 'Voucher system disabled',
+        'success'
+      );
+    } catch (error: any) {
+      console.error('Error toggling voucher system:', error);
+      showToast('Failed to update voucher system: ' + error.message, 'error');
     }
   };
 
@@ -223,7 +280,7 @@ function VouchersContent() {
     <div className="min-h-screen bg-gray-50">
       <DashboardSidebar />
       
-      <div className="ml-64 min-h-screen">
+      <div className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
         {/* Header */}
         <div className="bg-white shadow-sm sticky top-0 z-30">
           <div className="px-8 py-6">
@@ -232,21 +289,48 @@ function VouchersContent() {
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">Gift Vouchers</h1>
                 <p className="text-gray-600">Create and manage gift vouchers for your business</p>
               </div>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="bg-primary hover:bg-primary-dark text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center space-x-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                <span>Create Voucher</span>
-              </button>
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600">Voucher System:</span>
+                  <button
+                    onClick={handleToggleVoucherSystem}
+                    disabled={!voucherSystemActive && !hasPaymentProvider()}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      voucherSystemActive ? 'bg-primary' : 'bg-gray-300'
+                    } ${!voucherSystemActive && !hasPaymentProvider() ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      voucherSystemActive ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                  <span className={`text-sm font-medium ${voucherSystemActive ? 'text-green-600' : 'text-gray-600'}`}>
+                    {voucherSystemActive ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  disabled={!voucherSystemActive}
+                  className="bg-primary hover:bg-primary-dark text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  <span>Create Voucher</span>
+                </button>
+              </div>
             </div>
+            {!voucherSystemActive && !hasPaymentProvider() && (
+              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  ⚠️ Connect a payment provider (Stripe or Square) in Settings to enable the voucher system
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-8">
+        <div className="p-4 sm:p-6 lg:p-8">
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
@@ -456,7 +540,7 @@ function VouchersContent() {
                           {voucher.recipientEmail && (
                             <button
                               onClick={() => handleSendVoucherEmail(voucher)}
-                              className="mt-3 px-3 py-1 text-xs bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors"
+                              className="mt-2 w-full px-3 py-1 text-xs bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors"
                             >
                               📧 Send Email
                             </button>

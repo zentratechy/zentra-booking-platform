@@ -4,7 +4,13 @@ import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firesto
 import { db } from '@/lib/firebase';
 import { generateEmailTemplate, generateDailyReminderEmail } from '@/lib/emailTemplates';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Initialize Resend lazily to avoid build-time errors
+const getResend = () => {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY is not configured');
+  }
+  return new Resend(process.env.RESEND_API_KEY);
+};
 
 // This is a test endpoint to manually trigger daily reminders
 // Can be called from Settings page or directly
@@ -120,7 +126,8 @@ export async function POST(request: Request) {
     const emailHtml = generateDailyReminderEmail(reminderData, businessSettings);
 
     // Send email
-    const emailResult = await resend.emails.send({
+        const resend = getResend();
+        const emailResult = await resend.emails.send({
       from: 'Zentra <noreply@mail.zentrabooking.com>',
       to: [recipientStaffEmail],
       subject: `Tomorrow's Appointments - ${businessData.businessName}`,

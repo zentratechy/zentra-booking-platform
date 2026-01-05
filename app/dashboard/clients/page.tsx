@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import { formatPrice } from '@/lib/currency';
@@ -25,6 +25,8 @@ function ClientsManagementContent() {
   const [searchTerm, setSearchTerm] = useState('');
   const [businessCurrency, setBusinessCurrency] = useState('usd');
   const [clientConsultations, setClientConsultations] = useState<any[]>([]);
+  const [loyaltyTransactions, setLoyaltyTransactions] = useState<any[]>([]);
+  const [loadingTransactions, setLoadingTransactions] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -472,6 +474,27 @@ function ClientsManagementContent() {
       setClientConsultations([]);
     }
     
+    // Fetch loyalty transactions for this client
+    setLoadingTransactions(true);
+    try {
+      const transactionsQuery = query(
+        collection(db, 'clients', client.id, 'loyaltyTransactions'),
+        orderBy('createdAt', 'desc'),
+        limit(50) // Get last 50 transactions
+      );
+      const transactionsSnapshot = await getDocs(transactionsQuery);
+      const transactionsData = transactionsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setLoyaltyTransactions(transactionsData);
+    } catch (error) {
+      console.error('Error fetching loyalty transactions:', error);
+      setLoyaltyTransactions([]);
+    } finally {
+      setLoadingTransactions(false);
+    }
+    
     setShowDetailsModal(true);
   };
 
@@ -492,10 +515,10 @@ function ClientsManagementContent() {
       <DashboardSidebar />
 
       {/* Main Content */}
-      <div className="ml-64 min-h-screen">
+      <div className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
         {/* Top Bar */}
         <div className="bg-white shadow-sm sticky top-0 z-30">
-          <div className="px-8 py-4 flex justify-between items-center">
+          <div className="px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Clients</h2>
               <p className="text-gray-600">Manage your client relationships</p>
@@ -518,7 +541,7 @@ function ClientsManagementContent() {
         </div>
 
         {/* Content */}
-        <div className="p-8">
+        <div className="p-4 sm:p-6 lg:p-8">
           {/* Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
@@ -961,6 +984,81 @@ function ClientsManagementContent() {
                     <div className="text-sm text-gray-600">Tier</div>
                   </div>
                 </div>
+              </div>
+
+              {/* Loyalty Transaction History */}
+              <div>
+                <h4 className="text-lg font-semibold text-gray-900 mb-4">Loyalty Point History</h4>
+                {loadingTransactions ? (
+                  <div className="p-6 bg-gray-50 rounded-lg text-center">
+                    <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                    <p className="text-gray-600 text-sm">Loading transactions...</p>
+                  </div>
+                ) : loyaltyTransactions.length === 0 ? (
+                  <div className="p-6 bg-gray-50 rounded-lg text-center">
+                    <svg className="w-12 h-12 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    <p className="text-gray-600 text-sm">No transaction history yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {loyaltyTransactions.map((transaction) => {
+                      const transactionDate = transaction.createdAt?.toDate 
+                        ? transaction.createdAt.toDate() 
+                        : transaction.date?.toDate 
+                        ? transaction.date.toDate() 
+                        : transaction.createdAt 
+                        ? new Date(transaction.createdAt) 
+                        : new Date();
+                      
+                      const isEarned = transaction.type === 'earned';
+                      const points = Math.abs(transaction.points || 0);
+                      
+                      return (
+                        <div 
+                          key={transaction.id} 
+                          className={`p-4 rounded-lg border ${
+                            isEarned 
+                              ? 'bg-green-50 border-green-200' 
+                              : transaction.type === 'expired'
+                              ? 'bg-red-50 border-red-200'
+                              : 'bg-orange-50 border-orange-200'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2 mb-1">
+                                <span className={`px-2 py-1 text-xs rounded-full font-medium ${
+                                  isEarned 
+                                    ? 'bg-green-100 text-green-700' 
+                                    : transaction.type === 'expired'
+                                    ? 'bg-red-100 text-red-700'
+                                    : 'bg-orange-100 text-orange-700'
+                                }`}>
+                                  {isEarned ? 'Earned' : transaction.type === 'expired' ? 'Expired' : 'Redeemed'}
+                                </span>
+                                <span className="text-sm font-semibold text-gray-900">
+                                  {isEarned ? '+' : '-'}{points} points
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-700">{transaction.reason || 'Loyalty transaction'}</p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                {transactionDate.toLocaleDateString('en-US', { 
+                                  month: 'short', 
+                                  day: 'numeric', 
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Notes */}

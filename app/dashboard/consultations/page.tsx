@@ -253,7 +253,7 @@ function ConsultationsContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-soft-pink via-white to-soft-lavender">
       <DashboardSidebar />
-      <div className="ml-64 p-8">
+      <div className="lg:ml-64 p-8">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-8">

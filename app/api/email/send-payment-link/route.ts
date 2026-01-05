@@ -4,7 +4,13 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { generatePaymentLinkEmail } from '@/lib/emailTemplates';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Initialize Resend lazily to avoid build-time errors
+const getResend = () => {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY is not configured');
+  }
+  return new Resend(process.env.RESEND_API_KEY);
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -147,6 +153,7 @@ export async function POST(request: NextRequest) {
       .replace(/>\s*undefined\s*</gi, '><');
 
     // Send email using Resend
+    const resend = getResend();
     const { data, error } = await resend.emails.send({
       from: `${businessName} <noreply@mail.zentrabooking.com>`,
       replyTo: businessEmail,

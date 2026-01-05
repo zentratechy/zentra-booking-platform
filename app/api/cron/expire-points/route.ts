@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { collection, query, where, getDocs, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { logLoyaltyTransaction } from '@/lib/loyalty';
 
 export async function GET() {
   try {
@@ -46,16 +47,29 @@ export async function GET() {
           
           if (lastVisitDate < expirationDate) {
             try {
+              const pointsToExpire = clientData.loyaltyPoints || 0;
+              
               // Expire points
               await updateDoc(doc(db, 'clients', clientDoc.id), {
                 loyaltyPoints: 0,
-                pointsExpired: (clientData.pointsExpired || 0) + (clientData.loyaltyPoints || 0),
+                pointsExpired: (clientData.pointsExpired || 0) + pointsToExpire,
                 lastExpiration: serverTimestamp(),
                 updatedAt: serverTimestamp(),
               });
               
+              // Log the transaction
+              if (pointsToExpire > 0) {
+                await logLoyaltyTransaction(
+                  clientDoc.id,
+                  'expired',
+                  pointsToExpire,
+                  `Points expired after ${expirationMonths} months of inactivity`,
+                  undefined
+                );
+              }
+              
               totalExpired++;
-              console.log(`⏰ Expired ${clientData.loyaltyPoints} points for ${clientData.name} (${clientData.email})`);
+              console.log(`⏰ Expired ${pointsToExpire} points for ${clientData.name} (${clientData.email})`);
             } catch (error) {
               console.error(`❌ Error expiring points for ${clientData.name}:`, error);
             }

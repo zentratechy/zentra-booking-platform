@@ -7,11 +7,23 @@ import { collection, addDoc, serverTimestamp, Timestamp } from 'firebase/firesto
 export const dynamic = 'force-dynamic';
 import { Resend } from 'resend';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-09-30.clover',
-});
+// Initialize Stripe lazily to avoid build-time errors
+const getStripe = () => {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error('STRIPE_SECRET_KEY is not configured');
+  }
+  return new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: '2025-09-30.clover',
+  });
+};
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Initialize Resend lazily to avoid build-time errors
+const getResend = () => {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY is not configured');
+  }
+  return new Resend(process.env.RESEND_API_KEY);
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -134,7 +146,11 @@ async function handleVoucherPurchase(session: Stripe.Checkout.Session) {
 
     // Send voucher email to recipient
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://zentrabooking.com'}/api/email/send-voucher`, {
+      const emailUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://zentrabooking.com'}/api/email/send-voucher`;
+      console.log('📧 Sending voucher email to:', metadata.recipientEmail);
+      console.log('📧 Email endpoint:', emailUrl);
+      
+      const emailResponse = await fetch(emailUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -149,14 +165,27 @@ async function handleVoucherPurchase(session: Stripe.Checkout.Session) {
           purchaserEmail: metadata.purchaserEmail,
         }),
       });
-      console.log('✅ Voucher email sent to recipient');
-    } catch (emailError) {
-      console.error('❌ Error sending voucher email:', emailError);
+
+      if (!emailResponse.ok) {
+        const errorData = await emailResponse.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ Email API returned error:', emailResponse.status, errorData);
+        throw new Error(`Email API error: ${emailResponse.status} - ${errorData.error || 'Unknown error'}`);
+      }
+
+      const emailResult = await emailResponse.json();
+      console.log('✅ Voucher email sent to recipient:', emailResult);
+    } catch (emailError: any) {
+      console.error('❌ Error sending voucher email:', emailError.message || emailError);
+      // Don't throw - continue with voucher creation even if email fails
     }
 
     // Send confirmation email to purchaser
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://zentrabooking.com'}/api/email/send-voucher-confirmation`, {
+      const confirmationUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://zentrabooking.com'}/api/email/send-voucher-confirmation`;
+      console.log('📧 Sending confirmation email to:', metadata.purchaserEmail);
+      console.log('📧 Confirmation endpoint:', confirmationUrl);
+      
+      const confirmationResponse = await fetch(confirmationUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -170,9 +199,18 @@ async function handleVoucherPurchase(session: Stripe.Checkout.Session) {
           purchaserEmail: metadata.purchaserEmail,
         }),
       });
-      console.log('✅ Confirmation email sent to purchaser');
-    } catch (emailError) {
-      console.error('❌ Error sending confirmation email:', emailError);
+
+      if (!confirmationResponse.ok) {
+        const errorData = await confirmationResponse.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ Confirmation email API returned error:', confirmationResponse.status, errorData);
+        throw new Error(`Confirmation email API error: ${confirmationResponse.status} - ${errorData.error || 'Unknown error'}`);
+      }
+
+      const confirmationResult = await confirmationResponse.json();
+      console.log('✅ Confirmation email sent to purchaser:', confirmationResult);
+    } catch (emailError: any) {
+      console.error('❌ Error sending confirmation email:', emailError.message || emailError);
+      // Don't throw - continue with voucher creation even if email fails
     }
 
     console.log('🎉 Voucher created successfully:', code);

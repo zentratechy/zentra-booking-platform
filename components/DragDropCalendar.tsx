@@ -40,6 +40,7 @@ interface DragDropCalendarProps {
   onEditAppointment: (appointment: Appointment) => void;
   onAddAppointment?: (date: string, time: string) => void;
   onBlockTime?: (date: string, time: string) => void;
+  onEditBlockTime?: (blockedTime: any) => void;
   currency: string;
   businessHours: {
     monday?: { open: string; close: string };
@@ -357,6 +358,7 @@ const DragDropCalendar: React.FC<DragDropCalendarProps> = ({
   onEditAppointment,
   onAddAppointment,
   onBlockTime,
+  onEditBlockTime,
   currency,
   businessHours,
   showToast,

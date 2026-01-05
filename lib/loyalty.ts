@@ -1,5 +1,37 @@
-import { doc, getDoc, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, increment, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from './firebase';
+
+/**
+ * Log a loyalty point transaction
+ * @param clientId - The client ID
+ * @param type - Transaction type: 'earned' | 'redeemed' | 'expired'
+ * @param points - Points amount (positive for earned, negative for redeemed/expired)
+ * @param reason - Reason for the transaction
+ * @param relatedId - Optional related ID (appointment ID, etc.)
+ * @returns Promise<void>
+ */
+export async function logLoyaltyTransaction(
+  clientId: string,
+  type: 'earned' | 'redeemed' | 'expired',
+  points: number,
+  reason: string,
+  relatedId?: string
+): Promise<void> {
+  try {
+    await addDoc(collection(db, 'clients', clientId, 'loyaltyTransactions'), {
+      type,
+      points: type === 'earned' ? Math.abs(points) : -Math.abs(points), // Store as positive for earned, negative for redeemed/expired
+      reason,
+      relatedId: relatedId || null,
+      createdAt: serverTimestamp(),
+      date: serverTimestamp(),
+    });
+    console.log(`📝 Logged ${type} transaction: ${points} points - ${reason}`);
+  } catch (error) {
+    console.error('Error logging loyalty transaction:', error);
+    // Don't throw - transaction logging failure shouldn't break the main operation
+  }
+}
 
 /**
  * Award loyalty points to a client based on appointment completion
@@ -7,13 +39,15 @@ import { db } from './firebase';
  * @param clientId - The client ID (or null if from booking page)
  * @param clientEmail - The client email (for finding client if no ID)
  * @param appointmentAmount - The amount paid for the appointment
+ * @param appointmentId - Optional appointment ID for transaction logging
  * @returns Promise<boolean> - Success status
  */
 export async function awardLoyaltyPoints(
   businessId: string,
   clientId: string | null,
   clientEmail: string,
-  appointmentAmount: number
+  appointmentAmount: number,
+  appointmentId?: string
 ): Promise<boolean> {
   try {
     // Get business loyalty settings
@@ -50,6 +84,16 @@ export async function awardLoyaltyPoints(
       await updateDoc(doc(db, 'clients', clientId), {
         loyaltyPoints: increment(pointsToAward),
       });
+      
+      // Log the transaction
+      await logLoyaltyTransaction(
+        clientId,
+        'earned',
+        pointsToAward,
+        `Appointment completed - ${pointsToAward} points per $${appointmentAmount.toFixed(2)}`,
+        appointmentId
+      );
+      
       console.log(`✅ Awarded ${pointsToAward} points to client ${clientId}`);
       return true;
     }
@@ -146,6 +190,16 @@ export async function awardReferralPoints(
       await updateDoc(doc(db, 'clients', referrerId), {
         loyaltyPoints: increment(referralBonus),
       });
+      
+      // Log the transaction
+      await logLoyaltyTransaction(
+        referrerId,
+        'earned',
+        referralBonus,
+        `Referral bonus - referred a new customer`,
+        refereeId
+      );
+      
       console.log(`✅ Awarded ${referralBonus} referral bonus points to referrer ${referrerId}`);
     } catch (error) {
       console.error('Error awarding points to referrer:', error);
@@ -157,6 +211,16 @@ export async function awardReferralPoints(
       await updateDoc(doc(db, 'clients', refereeId), {
         loyaltyPoints: increment(referralBonus),
       });
+      
+      // Log the transaction
+      await logLoyaltyTransaction(
+        refereeId,
+        'earned',
+        referralBonus,
+        `Referral bonus - signed up via referral`,
+        referrerId
+      );
+      
       console.log(`✅ Awarded ${referralBonus} referral bonus points to referee ${refereeId}`);
     } catch (error) {
       console.error('Error awarding points to referee:', error);

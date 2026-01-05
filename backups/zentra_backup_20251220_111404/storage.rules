@@ -1,0 +1,30 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Business files (logos, email logos, etc.)
+    match /businesses/{businessId}/{allPaths=**} {
+      allow read: if true; // Public read for logos
+      allow write: if request.auth != null && request.auth.uid == businessId;
+    }
+    
+    // Client files (profile pictures, etc.)
+    match /clients/{clientId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == clientId;
+    }
+    
+    // Staff files (photos, etc.)
+    match /staff/{businessId}/{staffId}/{allPaths=**} {
+      allow read: if true; // Public read for staff photos
+      allow write: if request.auth != null;
+    }
+    
+    // Vouchers files (if any)
+    match /vouchers/{voucherId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}
+

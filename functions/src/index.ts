@@ -309,16 +309,38 @@ export const expireLoyaltyPoints = functions.pubsub
             
             if (lastVisitDate < expirationDate) {
               try {
+                const pointsToExpire = clientData.loyaltyPoints || 0;
+                
                 // Expire points
                 await clientDoc.ref.update({
                   loyaltyPoints: 0,
-                  pointsExpired: admin.firestore.FieldValue.increment(clientData.loyaltyPoints || 0),
+                  pointsExpired: admin.firestore.FieldValue.increment(pointsToExpire),
                   lastExpiration: admin.firestore.FieldValue.serverTimestamp(),
                   updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                 });
                 
+                // Log the transaction
+                if (pointsToExpire > 0) {
+                  try {
+                    await db.collection('clients').doc(clientDoc.id)
+                      .collection('loyaltyTransactions')
+                      .add({
+                        type: 'expired',
+                        points: -Math.abs(pointsToExpire), // Negative for expired
+                        reason: `Points expired after ${expirationMonths} months of inactivity`,
+                        relatedId: null,
+                        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                        date: admin.firestore.FieldValue.serverTimestamp(),
+                      });
+                    console.log(`📝 Logged expiration transaction for ${clientData.name}`);
+                  } catch (logError) {
+                    console.error(`❌ Error logging expiration transaction:`, logError);
+                    // Don't fail the expiration if logging fails
+                  }
+                }
+                
                 totalExpired++;
-                console.log(`⏰ Expired ${clientData.loyaltyPoints} points for ${clientData.name} (${clientData.email})`);
+                console.log(`⏰ Expired ${pointsToExpire} points for ${clientData.name} (${clientData.email})`);
               } catch (error) {
                 console.error(`❌ Error expiring points for ${clientData.name}:`, error);
               }

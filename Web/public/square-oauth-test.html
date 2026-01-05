@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Square OAuth Test</title>
+</head>
+<body>
+    <h1>Square OAuth Test</h1>
+    <p>Testing Square OAuth configuration...</p>
+    
+    <h2>Test Links:</h2>
+    
+    <h3>1. Minimal OAuth URL (only required parameters):</h3>
+    <a href="https://connect.squareupsandbox.com/oauth2/authorize?client_id=sandbox-sq0idb-OCfkSCT-pn7rk8GQ2kEgNQ&redirect_uri=https%3A%2F%2Fzentra-booking-platform.vercel.app%2Fapi%2Fsquare%2Foauth" target="_blank">
+        Test Minimal OAuth
+    </a>
+    
+    <h3>2. Full OAuth URL (with all parameters):</h3>
+    <a href="https://connect.squareupsandbox.com/oauth2/authorize?client_id=sandbox-sq0idb-OCfkSCT-pn7rk8GQ2kEgNQ&scope=MERCHANT_PROFILE_READ%20PAYMENTS_WRITE%20PAYMENTS_READ&state=test&session=false&redirect_uri=https%3A%2F%2Fzentra-booking-platform.vercel.app%2Fapi%2Fsquare%2Foauth" target="_blank">
+        Test Full OAuth
+    </a>
+    
+    <h3>3. Alternative redirect URI (localhost):</h3>
+    <a href="https://connect.squareupsandbox.com/oauth2/authorize?client_id=sandbox-sq0idb-OCfkSCT-pn7rk8GQ2kEgNQ&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fapi%2Fsquare%2Foauth" target="_blank">
+        Test with localhost redirect
+    </a>
+    
+    <script>
+        console.log('Square OAuth Test Page Loaded');
+        console.log('App ID:', 'sandbox-sq0idb-OCfkSCT-pn7rk8GQ2kEgNQ');
+        console.log('Redirect URI:', 'https://zentra-booking-platform.vercel.app/api/square/oauth');
+    </script>
+</body>
+</html>
+
+
+
+

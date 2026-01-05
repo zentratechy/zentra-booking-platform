@@ -4,7 +4,13 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { randomBytes } from 'crypto';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Initialize Resend lazily to avoid build-time errors
+const getResend = () => {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY is not configured');
+  }
+  return new Resend(process.env.RESEND_API_KEY);
+};
 
 export async function POST(request: Request) {
   try {
@@ -37,6 +43,7 @@ export async function POST(request: Request) {
     console.log('🚀 Sending password reset email via Resend...');
     
     // Send email
+    const resend = getResend();
     const data = await resend.emails.send({
       from: 'Zentra Booking <noreply@mail.zentrabooking.com>',
       to: [email],

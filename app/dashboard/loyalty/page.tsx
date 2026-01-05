@@ -267,10 +267,10 @@ function LoyaltyContent() {
       <DashboardSidebar />
 
       {/* Main Content */}
-      <div className="ml-64 min-h-screen">
+      <div className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
         {/* Top Bar */}
         <div className="bg-white shadow-sm sticky top-0 z-30">
-          <div className="px-8 py-4 flex justify-between items-center">
+          <div className="px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Loyalty Program</h2>
               <p className="text-gray-600">Reward your loyal clients and boost retention</p>
@@ -299,7 +299,7 @@ function LoyaltyContent() {
         </div>
 
         {/* Content */}
-        <div className="p-8">
+        <div className="p-4 sm:p-6 lg:p-8">
           {/* Stats Grid */}
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Loyalty Program Overview</h2>

@@ -230,11 +230,21 @@ export default function Signup() {
               />
               <span className="ml-2 text-sm text-gray-600">
                 I agree to the{' '}
-                <Link href="/terms" className="text-primary hover:text-primary-dark">
+                <Link 
+                  href="/terms" 
+                  className="text-primary hover:text-primary-dark"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   Terms of Service
                 </Link>{' '}
                 and{' '}
-                <Link href="/privacy" className="text-primary hover:text-primary-dark">
+                <Link 
+                  href="/privacy" 
+                  className="text-primary hover:text-primary-dark"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   Privacy Policy
                 </Link>
               </span>

@@ -299,7 +299,7 @@ function StaffManagementContent() {
     return (
       <div className="min-h-screen bg-soft-cream">
         <DashboardSidebar />
-        <div className="ml-64 min-h-screen flex items-center justify-center">
+        <div className="lg:ml-64 min-h-screen flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
             <p className="text-gray-600">Loading staff members...</p>
@@ -314,10 +314,10 @@ function StaffManagementContent() {
       <DashboardSidebar />
 
       {/* Main Content */}
-      <div className="ml-64 min-h-screen px-4 py-6">
+      <div className="lg:ml-64 min-h-screen px-4 py-6">
         {/* Top Bar */}
         <div className="bg-white shadow-sm sticky top-0 z-30">
-          <div className="px-8 py-4 flex justify-between items-center">
+          <div className="px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Staff Management</h2>
               <p className="text-gray-600">Manage your team members and their schedules</p>
@@ -763,7 +763,7 @@ function StaffManagementContent() {
               <button
                 onClick={() => {
                   setShowLimitModal(false);
-                  router.push('/dashboard/subscription');
+                  router.push('/subscription');
                 }}
                 className="w-full px-6 py-3 bg-primary hover:bg-primary-dark text-white rounded-lg font-semibold transition-colors"
               >
