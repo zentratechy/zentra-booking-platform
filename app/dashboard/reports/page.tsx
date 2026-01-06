@@ -889,21 +889,21 @@ function ReportsContent() {
     <div className="min-h-screen bg-soft-cream">
       <DashboardSidebar />
       <div className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
-        <div className="max-w-7xl mx-auto p-6">
+        <div className="max-w-7xl mx-auto p-4 sm:p-6">
           <SubscriptionGuard feature="advancedReporting">
         {/* Header */}
         <div className="mb-6">
-          <div className="flex justify-between items-start mb-4">
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 mb-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Business Reports & Analytics</h1>
-              <p className="text-gray-600">Comprehensive insights into your business performance</p>
+              <h1 className="text-xl lg:text-3xl font-bold text-gray-900 mb-2">Business Reports & Analytics</h1>
+              <p className="text-sm lg:text-base text-gray-600">Comprehensive insights into your business performance</p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-2 lg:flex lg:flex-wrap gap-2">
               <button
                 onClick={exportReport}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors flex items-center space-x-2"
+                className="px-3 lg:px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-center space-x-2 min-h-[44px] text-sm lg:text-base"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 <span>Export Summary</span>
@@ -911,9 +911,9 @@ function ReportsContent() {
               
               <button
                 onClick={exportAllCustomers}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors flex items-center space-x-2"
+                className="px-3 lg:px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-center space-x-2 min-h-[44px] text-sm lg:text-base"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
                 </svg>
                 <span>Export Customers</span>
@@ -921,9 +921,9 @@ function ReportsContent() {
               
               <button
                 onClick={exportAllPayments}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors flex items-center space-x-2"
+                className="px-3 lg:px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-center space-x-2 min-h-[44px] text-sm lg:text-base"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span>Export Payments</span>
@@ -931,9 +931,9 @@ function ReportsContent() {
               
               <button
                 onClick={exportAllGiftVouchers}
-                className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold transition-colors flex items-center space-x-2"
+                className="px-3 lg:px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold transition-colors flex items-center justify-center space-x-2 min-h-[44px] text-sm lg:text-base"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
                 </svg>
                 <span>Export Vouchers</span>
@@ -947,7 +947,7 @@ function ReportsContent() {
               <button
                 key={range}
                 onClick={() => setDateRange(range)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                className={`px-3 lg:px-4 py-2 rounded-lg font-medium transition-colors min-h-[44px] text-sm lg:text-base ${
                   dateRange === range
                     ? 'bg-primary text-white'
                     : 'bg-white text-gray-700 hover:bg-gray-100'
@@ -965,22 +965,22 @@ function ReportsContent() {
             {/* Custom Date Inputs */}
             {dateRange === 'custom' && (
               <>
-                <div className="flex flex-col">
+                <div className="flex flex-col w-full sm:w-auto">
                   <label className="text-xs text-gray-600 mb-1">Start Date</label>
                   <input
                     type="date"
                     value={customStartDate}
                     onChange={(e) => setCustomStartDate(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent min-h-[44px]"
                   />
                 </div>
-                <div className="flex flex-col">
+                <div className="flex flex-col w-full sm:w-auto">
                   <label className="text-xs text-gray-600 mb-1">End Date</label>
                   <input
                     type="date"
                     value={customEndDate}
                     onChange={(e) => setCustomEndDate(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    className="px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent min-h-[44px]"
                   />
                 </div>
               </>
@@ -990,57 +990,57 @@ function ReportsContent() {
 
         {/* Financial Overview */}
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Financial Overview</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+          <h2 className="text-lg lg:text-xl font-bold text-gray-900 mb-4">Financial Overview</h2>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm border border-gray-200">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-gray-600">Total Revenue</p>
-                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <p className="text-xs lg:text-sm text-gray-600">Total Revenue</p>
+                <div className="w-8 h-8 lg:w-10 lg:h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-4 h-4 lg:w-6 lg:h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
               </div>
-              <p className="text-2xl font-bold text-gray-900">{formatPrice(totalRevenue, currency)}</p>
+              <p className="text-xl lg:text-2xl font-bold text-gray-900">{formatPrice(totalRevenue, currency)}</p>
               <p className="text-xs text-gray-500 mt-1">{totalAppointments} appointments</p>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+            <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm border border-gray-200">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-gray-600">Collected</p>
-                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <p className="text-xs lg:text-sm text-gray-600">Collected</p>
+                <div className="w-8 h-8 lg:w-10 lg:h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-4 h-4 lg:w-6 lg:h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
               </div>
-              <p className="text-2xl font-bold text-green-600">{formatPrice(paidRevenue, currency)}</p>
+              <p className="text-xl lg:text-2xl font-bold text-green-600">{formatPrice(paidRevenue, currency)}</p>
               <p className="text-xs text-gray-500 mt-1">{collectionRate}% collection rate</p>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+            <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm border border-gray-200">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-gray-600">Outstanding</p>
-                <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <p className="text-xs lg:text-sm text-gray-600">Outstanding</p>
+                <div className="w-8 h-8 lg:w-10 lg:h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-4 h-4 lg:w-6 lg:h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
               </div>
-              <p className="text-2xl font-bold text-yellow-600">{formatPrice(outstandingBalance, currency)}</p>
+              <p className="text-xl lg:text-2xl font-bold text-yellow-600">{formatPrice(outstandingBalance, currency)}</p>
               <p className="text-xs text-gray-500 mt-1">Partial payments</p>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+            <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm border border-gray-200">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-gray-600">Refunded</p>
-                <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <p className="text-xs lg:text-sm text-gray-600">Refunded</p>
+                <div className="w-8 h-8 lg:w-10 lg:h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-4 h-4 lg:w-6 lg:h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" />
                   </svg>
                 </div>
               </div>
-              <p className="text-2xl font-bold text-red-600">{formatPrice(refundedAmount, currency)}</p>
+              <p className="text-xl lg:text-2xl font-bold text-red-600">{formatPrice(refundedAmount, currency)}</p>
               <p className="text-xs text-gray-500 mt-1">Total refunds</p>
             </div>
           </div>

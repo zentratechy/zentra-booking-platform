@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
@@ -433,13 +434,30 @@ function ConsultationsContent() {
 
       {/* Add/Edit Consultation Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-4xl w-full my-8">
-            <form onSubmit={handleSubmit}>
-              <div className="p-6 max-h-[85vh] overflow-y-auto">
-                <h3 className="text-2xl font-bold text-gray-900 mb-6">
-                  {selectedConsultation ? 'Edit Consultation' : 'New Consultation'}
-                </h3>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 lg:p-4 overflow-y-auto">
+          <div className="bg-white rounded-none lg:rounded-2xl max-w-4xl w-full h-full lg:h-auto max-h-full lg:max-h-[90vh] my-0 lg:my-8 overflow-hidden flex flex-col">
+            <form onSubmit={handleSubmit} className="flex flex-col h-full">
+              <div className="p-4 lg:p-6 overflow-y-auto flex-1">
+                <div className="sticky top-0 bg-white z-10 pb-4 border-b border-gray-200 mb-4 lg:mb-6 lg:static lg:border-0 lg:pb-0">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xl lg:text-2xl font-bold text-gray-900">
+                      {selectedConsultation ? 'Edit Consultation' : 'New Consultation'}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowModal(false);
+                        resetForm();
+                      }}
+                      className="lg:hidden p-2 -mr-2 text-gray-400 hover:text-gray-600 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                      aria-label="Close"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
 
                 {/* Client Selection */}
                 <div className="mb-6">
@@ -467,28 +485,45 @@ function ConsultationsContent() {
                 {/* Form Selection */}
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Consultation Form (Optional)</label>
-                  <select
-                    value={formData.selectedFormId}
-                    onChange={(e) => {
-                      const form = forms.find(f => f.id === e.target.value);
-                      setFormData({
-                        ...formData,
-                        selectedFormId: e.target.value,
-                        selectedFormName: form?.name || '',
-                        formResponses: {} // Reset form responses when changing form
-                      });
-                    }}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
-                  >
-                    <option value="">No form selected</option>
-                    {forms.map(form => (
-                      <option key={form.id} value={form.id}>{form.name}</option>
-                    ))}
-                  </select>
-                  {formData.selectedFormId && (
-                    <p className="text-sm text-gray-600 mt-2">
-                      Selected: {formData.selectedFormName}
-                    </p>
+                  {forms.length === 0 ? (
+                    <div className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 flex items-center justify-between">
+                      <span className="text-gray-500">No forms available</span>
+                      <Link
+                        href="/dashboard/forms"
+                        className="text-primary hover:text-primary-dark font-medium text-sm underline flex items-center gap-1"
+                      >
+                        Go to Form Library
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </Link>
+                    </div>
+                  ) : (
+                    <>
+                      <select
+                        value={formData.selectedFormId}
+                        onChange={(e) => {
+                          const form = forms.find(f => f.id === e.target.value);
+                          setFormData({
+                            ...formData,
+                            selectedFormId: e.target.value,
+                            selectedFormName: form?.name || '',
+                            formResponses: {} // Reset form responses when changing form
+                          });
+                        }}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                      >
+                        <option value="">No form selected</option>
+                        {forms.map(form => (
+                          <option key={form.id} value={form.id}>{form.name}</option>
+                        ))}
+                      </select>
+                      {formData.selectedFormId && (
+                        <p className="text-sm text-gray-600 mt-2">
+                          Selected: {formData.selectedFormName}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
 
@@ -627,8 +662,8 @@ function ConsultationsContent() {
                 {/* Consultation Type */}
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-2">Consultation Type *</label>
-                  <div className="flex space-x-4">
-                    <label className="flex items-center">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:space-x-4">
+                    <label className="flex items-center min-h-[44px]">
                       <input
                         type="radio"
                         value="initial"
@@ -638,7 +673,7 @@ function ConsultationsContent() {
                       />
                       <span className="text-sm text-gray-700">Initial Consultation</span>
                     </label>
-                    <label className="flex items-center">
+                    <label className="flex items-center min-h-[44px]">
                       <input
                         type="radio"
                         value="followup"
@@ -652,10 +687,10 @@ function ConsultationsContent() {
                 </div>
 
                 {/* Skin Analysis */}
-                <div className="mb-6 bg-blue-50 rounded-xl p-6">
+                <div className="mb-6 bg-blue-50 rounded-xl p-4 lg:p-6">
                   <h4 className="font-semibold text-gray-900 mb-4">Skin Analysis</h4>
                   
-                  <div className="grid md:grid-cols-2 gap-4 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Skin Type</label>
                       <select
@@ -675,9 +710,9 @@ function ConsultationsContent() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Skin Concerns</label>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {skinConcernOptions.map(concern => (
-                        <label key={concern} className="flex items-center">
+                        <label key={concern} className="flex items-center min-h-[44px]">
                           <input
                             type="checkbox"
                             checked={formData.skinConcerns.includes(concern)}
@@ -692,7 +727,7 @@ function ConsultationsContent() {
                 </div>
 
                 {/* Medical History */}
-                <div className="mb-6 bg-red-50 rounded-xl p-6">
+                <div className="mb-6 bg-red-50 rounded-xl p-4 lg:p-6">
                   <h4 className="font-semibold text-gray-900 mb-4">Medical History</h4>
                   
                   <div className="space-y-4">
@@ -732,7 +767,7 @@ function ConsultationsContent() {
                 </div>
 
                 {/* Current Routine */}
-                <div className="mb-6 bg-purple-50 rounded-xl p-6">
+                <div className="mb-6 bg-purple-50 rounded-xl p-4 lg:p-6">
                   <h4 className="font-semibold text-gray-900 mb-4">Current Routine & History</h4>
                   
                   <div className="space-y-4">
@@ -761,10 +796,10 @@ function ConsultationsContent() {
                 </div>
 
                 {/* Lifestyle Factors */}
-                <div className="mb-6 bg-green-50 rounded-xl p-6">
+                <div className="mb-6 bg-green-50 rounded-xl p-4 lg:p-6">
                   <h4 className="font-semibold text-gray-900 mb-4">Lifestyle Factors</h4>
                   
-                  <div className="grid md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Sun Exposure</label>
                       <select
@@ -834,7 +869,7 @@ function ConsultationsContent() {
                 </div>
 
                 {/* Recommendations */}
-                <div className="mb-6 bg-yellow-50 rounded-xl p-6">
+                <div className="mb-6 bg-yellow-50 rounded-xl p-4 lg:p-6">
                   <h4 className="font-semibold text-gray-900 mb-4">Recommendations & Treatment Plan</h4>
                   
                   <div className="space-y-4">
@@ -896,7 +931,7 @@ function ConsultationsContent() {
                 </div>
               </div>
 
-              <div className="border-t px-6 py-4 flex justify-end space-x-3">
+              <div className="border-t px-4 lg:px-6 py-4 flex flex-col-reverse lg:flex-row justify-end gap-3 lg:space-x-3 sticky bottom-0 bg-white z-10">
                 <button 
                   type="button"
                   onClick={() => {
@@ -904,14 +939,14 @@ function ConsultationsContent() {
                     resetForm();
                   }}
                   disabled={saving}
-                  className="px-6 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-semibold transition-colors disabled:opacity-50"
+                  className="w-full lg:w-auto px-6 py-3 lg:py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-semibold transition-colors disabled:opacity-50 min-h-[44px]"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit"
                   disabled={saving || !formData.clientId}
-                  className="px-6 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full lg:w-auto px-6 py-3 lg:py-2 bg-primary hover:bg-primary-dark text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
                 >
                   {saving ? 'Saving...' : selectedConsultation ? 'Update Consultation' : 'Save Consultation'}
                 </button>

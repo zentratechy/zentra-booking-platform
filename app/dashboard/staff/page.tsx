@@ -314,25 +314,25 @@ function StaffManagementContent() {
       <DashboardSidebar />
 
       {/* Main Content */}
-      <div className="lg:ml-64 min-h-screen px-4 py-6">
+      <div className="lg:ml-64 min-h-screen px-4 pt-16 lg:pt-6 pb-6">
         {/* Top Bar */}
-        <div className="bg-white shadow-sm sticky top-0 z-30">
-          <div className="px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Staff Management</h2>
-              <p className="text-gray-600">Manage your team members and their schedules</p>
+        <div className="bg-white shadow-sm sticky top-16 lg:top-0 z-30 -mx-4 lg:mx-0">
+          <div className="px-4 sm:px-6 lg:px-8 py-4 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3 lg:gap-4">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-xl lg:text-2xl font-bold text-gray-900">Staff Management</h2>
+              <p className="text-sm lg:text-base text-gray-600 hidden lg:block">Manage your team members and their schedules</p>
             </div>
-              <button 
-                onClick={() => {
-                  // Check staff limit based on subscription
-                  if (isLimitReached('staff', staffMembers.length)) {
-                    setShowLimitModal(true);
-                    return;
-                  }
-                  setShowAddModal(true);
-                }}
-                className="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg font-semibold transition-colors"
-              >
+            <button 
+              onClick={() => {
+                // Check staff limit based on subscription
+                if (isLimitReached('staff', staffMembers.length)) {
+                  setShowLimitModal(true);
+                  return;
+                }
+                setShowAddModal(true);
+              }}
+              className="bg-primary hover:bg-primary-dark text-white px-4 lg:px-6 py-2.5 lg:py-2 rounded-lg font-semibold transition-colors text-sm lg:text-base whitespace-nowrap min-h-[44px] w-full lg:w-auto"
+            >
               + Add Staff Member
             </button>
           </div>

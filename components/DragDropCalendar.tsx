@@ -784,39 +784,47 @@ const DragDropCalendar: React.FC<DragDropCalendarProps> = ({
     <DndProvider backend={HTML5Backend}>
       <div className="bg-white rounded-lg shadow-lg overflow-hidden">
         {/* Header */}
-        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+        <div className="bg-gray-50 px-4 lg:px-6 py-3 lg:py-4 border-b border-gray-200">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 lg:gap-4">
+            <div className="flex items-center justify-between lg:justify-start space-x-2 lg:space-x-4 flex-1 min-w-0">
               <button
                 onClick={() => navigateWeek('prev')}
-                className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                className="p-2 hover:bg-gray-200 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                aria-label="Previous week"
               >
                 ←
               </button>
-              <h2 className="text-xl font-bold text-gray-900">
-                {weekDates[0].toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} - {' '}
-                {weekDates[6].toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              <h2 className="text-base lg:text-xl font-bold text-gray-900 text-center lg:text-left flex-1 min-w-0">
+                <span className="block lg:inline">
+                  {weekDates[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </span>
+                <span className="hidden lg:inline"> - </span>
+                <span className="lg:hidden"> - </span>
+                <span className="block lg:inline">
+                  {weekDates[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
               </h2>
               <button
                 onClick={() => navigateWeek('next')}
-                className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                className="p-2 hover:bg-gray-200 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                aria-label="Next week"
               >
                 →
               </button>
             </div>
-                <div className="text-sm text-gray-600">
-                  Drag appointments to reschedule
-                </div>
-              </div>
+            <div className="text-xs lg:text-sm text-gray-600 text-center lg:text-right hidden lg:block">
+              Drag appointments to reschedule
             </div>
+          </div>
+        </div>
 
             {/* Staff Filter */}
             {uniqueStaff.length > 0 && (
-              <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="flex flex-wrap gap-4 items-center">
-                  <span className="text-sm font-medium text-gray-700">Staff:</span>
+              <div className="mt-3 lg:mt-4 p-3 lg:p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex flex-wrap gap-2 lg:gap-4 items-center">
+                  <span className="text-xs lg:text-sm font-medium text-gray-700 w-full lg:w-auto mb-1 lg:mb-0">Staff:</span>
                   {uniqueStaff.map((staffName) => (
-                    <label key={staffName} className="flex items-center space-x-2 cursor-pointer px-3 py-2 bg-white rounded-md border border-gray-200 hover:bg-gray-50 transition-colors">
+                    <label key={staffName} className="flex items-center space-x-2 cursor-pointer px-2 lg:px-3 py-2 bg-white rounded-md border border-gray-200 hover:bg-gray-50 transition-colors min-h-[44px]">
                       <input
                         type="checkbox"
                         checked={selectedStaff.has(staffName)}
@@ -830,7 +838,7 @@ const DragDropCalendar: React.FC<DragDropCalendarProps> = ({
                       >
                         <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                       </svg>
-                      <span className="text-sm text-gray-600">{staffName}</span>
+                      <span className="text-xs lg:text-sm text-gray-600">{staffName}</span>
                     </label>
                   ))}
                 </div>
@@ -838,17 +846,17 @@ const DragDropCalendar: React.FC<DragDropCalendarProps> = ({
             )}
 
         {/* Calendar Grid */}
-        <div className="overflow-x-auto">
-          <div className="min-w-[1200px]">
+        <div className="overflow-x-auto -mx-4 lg:mx-0">
+          <div className="min-w-[800px] lg:min-w-[1200px]">
             {/* Day Headers */}
-            <div className="grid grid-cols-8 border-b border-gray-200">
-              <div className="p-2 bg-gray-50 font-medium text-gray-700 text-sm">Time</div>
+            <div className="grid border-b border-gray-200" style={{ gridTemplateColumns: 'minmax(70px, 90px) repeat(7, 1fr)' }}>
+              <div className="p-2 lg:p-2 bg-gray-50 font-medium text-gray-700 text-xs lg:text-sm whitespace-nowrap text-center">Time</div>
               {weekDates.map((date, index) => (
-                <div key={index} className="p-2 bg-gray-50 text-center">
-                  <div className="font-medium text-gray-900 text-sm">
+                <div key={index} className="p-1.5 lg:p-2 bg-gray-50 text-center">
+                  <div className="font-medium text-gray-900 text-xs lg:text-sm">
                     {date.toLocaleDateString('en-US', { weekday: 'short' })}
                   </div>
-                  <div className="text-xs text-gray-600">
+                  <div className="text-xs lg:text-xs text-gray-600">
                     {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </div>
                 </div>
@@ -857,9 +865,9 @@ const DragDropCalendar: React.FC<DragDropCalendarProps> = ({
 
             {/* Time Slots */}
             {timeSlots.map((timeSlot, timeIndex) => (
-              <div key={timeIndex} className="grid grid-cols-8 border-b border-gray-100">
+              <div key={timeIndex} className="grid border-b border-gray-100" style={{ gridTemplateColumns: 'minmax(70px, 90px) repeat(7, 1fr)' }}>
                 {/* Time Label */}
-                <div className="p-1 bg-gray-50 text-xs text-gray-600 font-medium">
+                <div className="p-1 lg:p-1 bg-gray-50 text-xs text-gray-600 font-medium whitespace-nowrap text-center">
                   {timeSlot}
                 </div>
                 

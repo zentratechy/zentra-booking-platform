@@ -20,21 +20,23 @@ let auth: any = null;
 let db: any = null;
 let storage: any = null;
 
-// Only initialize if we're in a browser environment and config is valid
-if (typeof window !== 'undefined') {
-  if (firebaseConfig.apiKey && firebaseConfig.projectId) {
-    try {
-      app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+// Initialize Firebase if config is valid (works in both browser and server)
+if (firebaseConfig.apiKey && firebaseConfig.projectId) {
+  try {
+    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+    db = getFirestore(app);
+    
+    // Only initialize auth and storage in browser (they require browser APIs)
+    if (typeof window !== 'undefined') {
       auth = getAuth(app);
-      db = getFirestore(app);
       storage = getStorage(app);
-    } catch (error) {
-      console.error('Firebase initialization error:', error);
-      // Don't throw - allow the app to continue without Firebase in some contexts
     }
-  } else {
-    console.warn('Firebase configuration is missing. Please check your environment variables.');
+  } catch (error) {
+    console.error('Firebase initialization error:', error);
+    // Don't throw - allow the app to continue without Firebase in some contexts
   }
+} else {
+  console.warn('Firebase configuration is missing. Please check your environment variables.');
 }
 
 export { auth, db, storage };

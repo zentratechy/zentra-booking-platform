@@ -269,20 +269,20 @@ function LoyaltyContent() {
       {/* Main Content */}
       <div className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
         {/* Top Bar */}
-        <div className="bg-white shadow-sm sticky top-0 z-30">
-          <div className="px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+        <div className="bg-white shadow-sm sticky top-16 lg:top-0 z-30">
+          <div className="px-4 sm:px-6 lg:px-8 py-4 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Loyalty Program</h2>
-              <p className="text-gray-600">Reward your loyal clients and boost retention</p>
+              <h2 className="text-xl lg:text-2xl font-bold text-gray-900">Loyalty Program</h2>
+              <p className="text-sm lg:text-base text-gray-600">Reward your loyal clients and boost retention</p>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4">
               <div className="flex items-center space-x-2">
                 <span className="text-sm text-gray-600">Program Status:</span>
                 <button
                   onClick={handleToggleProgram}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${programActive ? 'bg-primary' : 'bg-gray-300'}`}
+                  className={`toggle-switch relative inline-flex min-h-[25px] w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${programActive ? 'bg-primary' : 'bg-gray-300'}`}
                 >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${programActive ? 'translate-x-6' : 'translate-x-1'}`} />
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm border border-gray-200 transition-transform duration-200 ease-in-out ${programActive ? 'translate-x-6' : 'translate-x-1'}`} />
                 </button>
                 <span className={`text-sm font-medium ${programActive ? 'text-green-600' : 'text-gray-600'}`}>
                   {programActive ? 'Active' : 'Inactive'}
@@ -290,7 +290,7 @@ function LoyaltyContent() {
               </div>
               <button 
                 onClick={() => setShowAddRewardModal(true)}
-                className="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+                className="bg-primary hover:bg-primary-dark text-white px-6 py-2.5 rounded-lg font-semibold transition-colors min-h-[44px] w-full lg:w-auto"
               >
                 + New Reward
               </button>
@@ -301,12 +301,12 @@ function LoyaltyContent() {
         {/* Content */}
         <div className="p-4 sm:p-6 lg:p-8">
           {/* Stats Grid */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Loyalty Program Overview</h2>
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+            <h2 className="text-xl lg:text-2xl font-bold text-gray-900">Loyalty Program Overview</h2>
             <button
               onClick={handleRefreshClients}
               disabled={refreshing}
-              className="flex items-center space-x-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center space-x-2 px-4 py-2.5 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] w-full lg:w-auto"
             >
               <svg className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -314,11 +314,11 @@ function LoyaltyContent() {
               <span>{refreshing ? 'Refreshing...' : 'Refresh Data'}</span>
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
             {stats.map((stat, index) => (
-              <div key={index} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-                <p className="text-sm text-gray-600 mb-2">{stat.label}</p>
-                <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+              <div key={index} className="bg-white rounded-xl p-4 lg:p-6 shadow-sm border border-gray-100">
+                <p className="text-xs lg:text-sm text-gray-600 mb-2">{stat.label}</p>
+                <p className="text-2xl lg:text-3xl font-bold text-gray-900">{stat.value}</p>
               </div>
             ))}
           </div>

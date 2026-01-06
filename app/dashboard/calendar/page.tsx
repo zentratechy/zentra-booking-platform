@@ -1060,23 +1060,23 @@ function CalendarContent() {
       <div className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
         {/* Top Bar */}
         <div className="bg-white shadow-sm sticky top-0 z-30">
-          <div className="px-4 sm:px-6 lg:px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Calendar & Appointments</h2>
-                <p className="text-gray-600">Manage your schedule and bookings</p>
+          <div className="px-4 sm:px-6 lg:px-8 py-3 lg:py-4">
+            <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3 lg:gap-4">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl lg:text-2xl font-bold text-gray-900 truncate">Calendar & Appointments</h2>
+                <p className="text-sm lg:text-base text-gray-600 hidden lg:block">Manage your schedule and bookings</p>
               </div>
-              <div className="flex items-center space-x-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 lg:gap-4">
                 {locations.length > 1 && (
                   <div className="flex items-center space-x-2">
-                    <label className="text-sm font-medium text-gray-700">Location:</label>
+                    <label className="text-xs lg:text-sm font-medium text-gray-700 whitespace-nowrap">Location:</label>
                     <select
                       value={selectedLocation?.id || ''}
                       onChange={(e) => {
                         const location = locations.find(loc => loc.id === e.target.value);
                         setSelectedLocation(location || null);
                       }}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-sm"
+                      className="px-2 lg:px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-sm flex-1 min-w-0"
                     >
                       <option value="">All Locations</option>
                       {locations.map((location) => (
@@ -1087,14 +1087,12 @@ function CalendarContent() {
                     </select>
                   </div>
                 )}
-                <div className="flex space-x-3">
-                  <button 
-                    onClick={() => setShowAddModal(true)}
-                    className="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg font-semibold transition-colors"
-                  >
-                    + New Appointment
-                  </button>
-                </div>
+                <button 
+                  onClick={() => setShowAddModal(true)}
+                  className="bg-primary hover:bg-primary-dark text-white px-4 lg:px-6 py-2 rounded-lg font-semibold transition-colors text-sm lg:text-base whitespace-nowrap min-h-[44px]"
+                >
+                  + New Appointment
+                </button>
               </div>
             </div>
           </div>
@@ -1190,17 +1188,18 @@ function CalendarContent() {
 
       {/* Add Appointment Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Add New Appointment</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-0 lg:p-4">
+          <div className="bg-white rounded-none lg:rounded-xl p-4 lg:p-8 max-w-2xl w-full h-full lg:h-auto max-h-full lg:max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4 lg:mb-6 sticky top-0 bg-white z-10 pb-4 border-b border-gray-200 lg:border-0 lg:pb-0">
+              <h2 className="text-xl lg:text-2xl font-bold text-gray-900">Add New Appointment</h2>
               <button
                 onClick={() => {
                   setShowAddModal(false);
                   setIsNewClient(false);
                   setNewClientData({ name: '', email: '', phone: '' });
                 }}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 p-2 -mr-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                aria-label="Close"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1208,7 +1207,7 @@ function CalendarContent() {
               </button>
             </div>
 
-            <form onSubmit={handleAddAppointment} className="space-y-6">
+            <form onSubmit={handleAddAppointment} className="space-y-4 lg:space-y-6">
               {/* Client Selection */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Client</label>
@@ -1249,11 +1248,11 @@ function CalendarContent() {
 
                   {/* Search and Add Buttons */}
                   {!formData.clientId && !isNewClient && (
-                    <div className="flex space-x-2">
+                    <div className="flex flex-col lg:flex-row gap-2 lg:space-x-2">
                       <button
                         type="button"
                         onClick={() => setShowClientSearchModal(true)}
-                        className="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 text-left text-gray-700 focus:ring-2 focus:ring-primary focus:border-transparent outline-none"
+                        className="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 text-left text-gray-700 focus:ring-2 focus:ring-primary focus:border-transparent outline-none min-h-[44px]"
                       >
                         🔍 Search clients...
                       </button>
@@ -1263,7 +1262,7 @@ function CalendarContent() {
                           setIsNewClient(true);
                           setFormData({ ...formData, clientId: '' });
                         }}
-                        className="px-4 py-3 bg-primary hover:bg-primary-dark text-white rounded-lg font-medium transition-colors"
+                        className="px-4 py-3 bg-primary hover:bg-primary-dark text-white rounded-lg font-medium transition-colors min-h-[44px] whitespace-nowrap"
                       >
                         + Add New
                       </button>
@@ -1478,7 +1477,7 @@ function CalendarContent() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex justify-end space-x-3 pt-6">
+              <div className="flex flex-col-reverse lg:flex-row justify-end gap-3 lg:space-x-3 pt-6">
                 <button
                   type="button"
                   onClick={() => {
@@ -1486,14 +1485,14 @@ function CalendarContent() {
                     setIsNewClient(false);
                     setNewClientData({ name: '', email: '', phone: '' });
                   }}
-                  className="px-6 py-3 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg font-semibold transition-colors"
+                  className="w-full lg:w-auto px-6 py-3 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg font-semibold transition-colors min-h-[44px]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-6 py-3 bg-primary hover:bg-primary-dark text-white rounded-lg font-semibold transition-colors disabled:opacity-50"
+                  className="w-full lg:w-auto px-6 py-3 bg-primary hover:bg-primary-dark text-white rounded-lg font-semibold transition-colors disabled:opacity-50 min-h-[44px]"
                 >
                   {saving ? 'Creating...' : 'Create Appointment'}
                 </button>

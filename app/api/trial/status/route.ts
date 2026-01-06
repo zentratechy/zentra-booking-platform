@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import Stripe from 'stripe';
-import { trackApiRequest } from '@/lib/api-middleware';
 
 // Initialize Stripe lazily to avoid build-time errors
 const getStripe = () => {
@@ -16,9 +15,6 @@ const getStripe = () => {
 
 export async function GET(request: NextRequest) {
   try {
-    // Track API call
-    await trackApiRequest(request, '/api/trial/status');
-    
     const { searchParams } = new URL(request.url);
     const businessId = searchParams.get('businessId');
 

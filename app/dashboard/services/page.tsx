@@ -24,6 +24,7 @@ function ServicesManagementContent() {
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState('usd');
   const [businessSettings, setBusinessSettings] = useState<any>(null);
+  const [showOptions, setShowOptions] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     category: '',
@@ -572,27 +573,25 @@ function ServicesManagementContent() {
       {/* Main Content */}
       <div className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
         {/* Top Bar */}
-        <div className="bg-white shadow-sm sticky top-0 z-30">
-          <div className="px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Services</h2>
-              <p className="text-gray-600">Manage your service catalog and pricing</p>
+        <div className="bg-white shadow-sm sticky top-16 lg:top-0 z-30 -mx-4 lg:mx-0">
+          <div className="px-4 sm:px-6 lg:px-8 py-4 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 lg:gap-4">
+            <div className="flex-1 min-w-0 pl-4 lg:pl-0">
+              <h2 className="text-xl lg:text-2xl font-bold text-gray-900 mb-1 lg:mb-0">Services</h2>
+              <p className="text-sm lg:text-base text-gray-600 hidden lg:block">Manage your service catalog and pricing</p>
             </div>
-            <div className="flex space-x-3">
-              <div className="relative">
-                <button 
-                  onClick={() => setShowExportModal(true)}
-                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors flex items-center"
-                >
-                  📤 Export Data
-                  <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-              </div>
+            <div className="flex flex-col lg:flex-row gap-2 lg:space-x-3 lg:flex-nowrap w-full lg:w-auto px-4 lg:px-0">
+              <button 
+                onClick={() => setShowExportModal(true)}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 lg:px-6 py-3 lg:py-2 rounded-lg font-semibold transition-colors flex items-center justify-center text-sm lg:text-base min-h-[44px] w-full lg:w-auto"
+              >
+                📤 Export Data
+                <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
               <button 
                 onClick={() => setShowImportModal(true)}
-                className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+                className="bg-gray-600 hover:bg-gray-700 text-white px-4 lg:px-6 py-3 lg:py-2 rounded-lg font-semibold transition-colors text-sm lg:text-base min-h-[44px] w-full lg:w-auto"
               >
                 📁 Import CSV
               </button>
@@ -610,7 +609,7 @@ function ServicesManagementContent() {
                   });
                   setShowAddModal(true);
                 }}
-                className="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+                className="bg-primary hover:bg-primary-dark text-white px-4 lg:px-6 py-3 lg:py-2 rounded-lg font-semibold transition-colors text-sm lg:text-base min-h-[44px] w-full lg:w-auto"
               >
                 + Add Service
               </button>
@@ -685,42 +684,43 @@ function ServicesManagementContent() {
                   </div>
                   <div className="divide-y divide-gray-100">
                     {(categoryServices as any[]).map((service) => (
-                      <div key={service.id} className="p-6 hover:bg-soft-pink/20 transition-colors">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-3 mb-2">
-                              <h4 className="text-lg font-semibold text-gray-900">{service.name}</h4>
-                              <span className={`px-2 py-1 text-xs rounded-full ${service.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                      <div key={service.id} className="p-4 lg:p-6 hover:bg-soft-pink/20 transition-colors">
+                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 mb-2 gap-2">
+                              <h4 className="text-base lg:text-lg font-semibold text-gray-900 truncate">{service.name}</h4>
+                              <span className={`px-2 py-1 text-xs rounded-full self-start ${service.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
                                 {service.active ? 'Active' : 'Inactive'}
                               </span>
                             </div>
                             {service.description && (
-                              <p className="text-sm text-gray-600 mb-3">{service.description}</p>
+                              <p className="text-sm text-gray-600 mb-3 line-clamp-2">{service.description}</p>
                             )}
-                            <div className="flex items-center space-x-6 text-sm text-gray-600">
+                            <div className="flex flex-wrap items-center gap-4 lg:gap-6 text-sm text-gray-600">
                               <div className="flex items-center">
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-4 h-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                {service.duration} minutes
+                                <span>{service.duration} minutes</span>
                               </div>
                               <div className="flex items-center">
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-4 h-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                {formatPrice(service.price, currency)}
+                                <span>{formatPrice(service.price, currency)}</span>
                               </div>
                               {service.depositRequired && (
                                 <div className="flex items-center text-primary">
-                                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <svg className="w-4 h-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                   </svg>
-                                  {service.depositPercentage}% deposit required
+                                  <span>{service.depositPercentage}% deposit required</span>
                                 </div>
                               )}
                             </div>
                           </div>
-                          <div className="flex space-x-2 ml-4">
+                          {/* Desktop buttons */}
+                          <div className="hidden lg:flex space-x-2 ml-4">
                             <button 
                               onClick={() => handleToggleActive(service)}
                               className={`px-4 py-2 text-sm rounded-lg transition-colors ${
@@ -743,6 +743,68 @@ function ServicesManagementContent() {
                             >
                               Delete
                             </button>
+                          </div>
+                          {/* Mobile options button */}
+                          <div className="lg:hidden relative">
+                            <button
+                              onClick={() => setShowOptions(showOptions === service.id ? null : service.id)}
+                              className="p-2 hover:bg-gray-100 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                              aria-label="Options"
+                            >
+                              <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                              </svg>
+                            </button>
+                            {showOptions === service.id && (
+                              <>
+                                <div 
+                                  className="fixed inset-0 z-40" 
+                                  onClick={() => setShowOptions(null)}
+                                />
+                                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1">
+                                  <button
+                                    onClick={() => {
+                                      handleToggleActive(service);
+                                      setShowOptions(null);
+                                    }}
+                                    className={`w-full px-4 py-3 text-left text-sm transition-colors flex items-center ${
+                                      service.active
+                                        ? 'text-orange-600 hover:bg-orange-50'
+                                        : 'text-green-600 hover:bg-green-50'
+                                    }`}
+                                  >
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={service.active ? "M6 18L18 6M6 6l12 12" : "M5 13l4 4L19 7"} />
+                                    </svg>
+                                    {service.active ? 'Deactivate' : 'Activate'}
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      handleEditClick(service);
+                                      setShowOptions(null);
+                                    }}
+                                    className="w-full px-4 py-3 text-left text-sm text-primary hover:bg-primary/10 transition-colors flex items-center"
+                                  >
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      handleDeleteClick(service);
+                                      setShowOptions(null);
+                                    }}
+                                    className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center"
+                                  >
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    Delete
+                                  </button>
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>

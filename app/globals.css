@@ -59,3 +59,49 @@ html {
     overflow-x: hidden;
   }
 }
+
+/* Mobile-specific optimizations */
+@media screen and (max-width: 1023px) {
+  /* Ensure modals are full-screen or properly sized on mobile */
+  .modal-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+  
+  /* Better touch targets */
+  button:not(.toggle-switch), a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Prevent horizontal scroll */
+  body {
+    overflow-x: hidden;
+  }
+  
+  /* Better form inputs on mobile */
+  input, select, textarea {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+  
+  /* Card spacing on mobile */
+  .card-mobile {
+    margin-bottom: 12px;
+  }
+}
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
+/* Desktop remains unchanged - no mobile styles apply above lg breakpoint */

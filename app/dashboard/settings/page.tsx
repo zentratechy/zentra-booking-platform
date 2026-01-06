@@ -921,20 +921,20 @@ function SettingsContent() {
       <DashboardSidebar />
 
       {/* Main Content */}
-      <div className="lg:ml-64 p-8">
-        <div className="max-w-6xl mx-auto">
+      <div className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
+        <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Settings</h1>
-            <p className="text-gray-600">Manage your business settings and preferences</p>
+          <div className="mb-6 lg:mb-8">
+            <h1 className="text-xl lg:text-3xl font-bold text-gray-900 mb-2">Settings</h1>
+            <p className="text-sm lg:text-base text-gray-600">Manage your business settings and preferences</p>
           </div>
 
           {/* Tabs */}
-          <div className="mb-8 border-b border-gray-200">
-            <div className="flex space-x-8">
+          <div className="mb-6 lg:mb-8 border-b border-gray-200">
+            <div className="flex space-x-4 lg:space-x-8 overflow-x-auto scrollbar-hide -mx-4 sm:-mx-6 lg:mx-0 px-4 sm:px-6 lg:px-0 pb-2">
               <button
                 onClick={() => setSelectedTab('business')}
-                className={`pb-4 px-2 font-medium transition-colors relative ${
+                className={`pb-4 px-2 font-medium transition-colors relative whitespace-nowrap flex-shrink-0 min-h-[44px] text-sm lg:text-base ${
                   selectedTab === 'business'
                     ? 'text-gray-900 border-b-2'
                     : 'text-gray-500 hover:text-gray-700'
@@ -945,7 +945,7 @@ function SettingsContent() {
               </button>
               <button
                 onClick={() => setSelectedTab('locations')}
-                className={`pb-4 px-2 font-medium transition-colors relative ${
+                className={`pb-4 px-2 font-medium transition-colors relative whitespace-nowrap flex-shrink-0 min-h-[44px] text-sm lg:text-base ${
                   selectedTab === 'locations'
                     ? 'text-gray-900 border-b-2'
                     : 'text-gray-500 hover:text-gray-700'
@@ -956,7 +956,7 @@ function SettingsContent() {
               </button>
               <button
                 onClick={() => setSelectedTab('calendar')}
-                className={`pb-4 px-2 font-medium transition-colors relative ${
+                className={`pb-4 px-2 font-medium transition-colors relative whitespace-nowrap flex-shrink-0 min-h-[44px] text-sm lg:text-base ${
                   selectedTab === 'calendar'
                     ? 'text-gray-900 border-b-2'
                     : 'text-gray-500 hover:text-gray-700'
@@ -967,7 +967,7 @@ function SettingsContent() {
               </button>
               <button
                 onClick={() => setSelectedTab('bookings')}
-                className={`pb-4 px-2 font-medium transition-colors relative ${
+                className={`pb-4 px-2 font-medium transition-colors relative whitespace-nowrap flex-shrink-0 min-h-[44px] text-sm lg:text-base ${
                   selectedTab === 'bookings'
                     ? 'text-gray-900 border-b-2'
                     : 'text-gray-500 hover:text-gray-700'
@@ -978,7 +978,7 @@ function SettingsContent() {
               </button>
               <button
                 onClick={() => setSelectedTab('payments')}
-                className={`pb-4 px-2 font-medium transition-colors relative ${
+                className={`pb-4 px-2 font-medium transition-colors relative whitespace-nowrap flex-shrink-0 min-h-[44px] text-sm lg:text-base ${
                   selectedTab === 'payments'
                     ? 'text-gray-900 border-b-2'
                     : 'text-gray-500 hover:text-gray-700'
@@ -989,7 +989,7 @@ function SettingsContent() {
               </button>
               <button
                 onClick={() => setSelectedTab('account')}
-                className={`pb-4 px-2 font-medium transition-colors relative ${
+                className={`pb-4 px-2 font-medium transition-colors relative whitespace-nowrap flex-shrink-0 min-h-[44px] text-sm lg:text-base ${
                   selectedTab === 'account'
                     ? 'text-gray-900 border-b-2'
                     : 'text-gray-500 hover:text-gray-700'
@@ -1000,7 +1000,7 @@ function SettingsContent() {
               </button>
               <button
                 onClick={() => setSelectedTab('styles')}
-                className={`pb-4 px-2 font-medium transition-colors relative ${
+                className={`pb-4 px-2 font-medium transition-colors relative whitespace-nowrap flex-shrink-0 min-h-[44px] text-sm lg:text-base ${
                   selectedTab === 'styles'
                     ? 'text-gray-900 border-b-2'
                     : 'text-gray-500 hover:text-gray-700'
@@ -1011,7 +1011,7 @@ function SettingsContent() {
               </button>
               <button
                 onClick={() => setSelectedTab('emails')}
-                className={`pb-4 px-2 font-medium transition-colors relative ${
+                className={`pb-4 px-2 font-medium transition-colors relative whitespace-nowrap flex-shrink-0 min-h-[44px] text-sm lg:text-base ${
                   selectedTab === 'emails'
                     ? 'text-gray-900 border-b-2'
                     : 'text-gray-500 hover:text-gray-700'

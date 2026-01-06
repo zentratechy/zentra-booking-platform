@@ -21,6 +21,7 @@ function ProductsManagementContent() {
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState('usd');
   const [businessSettings, setBusinessSettings] = useState<any>(null);
+  const [showOptions, setShowOptions] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     category: '',
@@ -261,23 +262,29 @@ function ProductsManagementContent() {
     <ProtectedRoute>
       <div className="min-h-screen bg-soft-cream">
         <DashboardSidebar />
-        <div className="lg:pl-64">
-          <div className="p-8">
+        <div className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
+          {/* Top Bar */}
+          <div className="bg-white shadow-sm sticky top-16 lg:top-0 z-30 -mx-4 lg:mx-0">
+            <div className="px-4 sm:px-6 lg:px-8 py-4 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 lg:gap-4">
+              <div className="flex-1 min-w-0 pl-4 lg:pl-0">
+                <h1 className="text-xl lg:text-3xl font-bold text-gray-900 mb-1 lg:mb-0">Products</h1>
+                <p className="text-sm lg:text-base text-gray-600 hidden lg:block">Manage your product inventory</p>
+              </div>
+              <div className="flex flex-col lg:flex-row gap-2 lg:space-x-3 lg:flex-nowrap w-full lg:w-auto px-4 lg:px-0">
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="bg-primary hover:bg-primary-dark text-white px-4 lg:px-6 py-3 lg:py-3 rounded-lg font-semibold transition-colors text-sm lg:text-base min-h-[44px] w-full lg:w-auto"
+                >
+                  + Add Product
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div className="p-4 sm:p-6 lg:p-8">
             <div className="max-w-7xl mx-auto">
               {/* Header */}
               <div className="mb-8">
-                <div className="flex justify-between items-center mb-4">
-                  <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Products</h1>
-                    <p className="text-gray-600 mt-1">Manage your product inventory</p>
-                  </div>
-                  <button
-                    onClick={() => setShowAddModal(true)}
-                    className="px-6 py-3 bg-primary hover:bg-primary-dark text-white rounded-lg font-semibold transition-colors"
-                  >
-                    + Add Product
-                  </button>
-                </div>
 
                 {/* Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
@@ -357,15 +364,15 @@ function ProductsManagementContent() {
                 ) : (
                   <div className="divide-y divide-gray-100">
                     {filteredProducts.map((product) => (
-                      <div key={product.id} className="p-6 hover:bg-soft-pink/20 transition-colors">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-3 mb-2">
-                              <h3 className="text-lg font-semibold text-gray-900">{product.name}</h3>
+                      <div key={product.id} className="p-4 lg:p-6 hover:bg-soft-pink/20 transition-colors">
+                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 mb-2 gap-2">
+                              <h3 className="text-base lg:text-lg font-semibold text-gray-900 truncate">{product.name}</h3>
                               {product.sku && (
-                                <span className="text-sm text-gray-500">SKU: {product.sku}</span>
+                                <span className="text-xs lg:text-sm text-gray-500 self-start">SKU: {product.sku}</span>
                               )}
-                              <span className={`px-3 py-1 text-xs rounded-full font-medium ${
+                              <span className={`px-2 lg:px-3 py-1 text-xs rounded-full font-medium self-start ${
                                 product.active === false 
                                   ? 'bg-gray-100 text-gray-700' 
                                   : product.stock === 0
@@ -383,16 +390,17 @@ function ProductsManagementContent() {
                                       : `In Stock (${product.stock})`}
                               </span>
                             </div>
-                            <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 text-sm text-gray-600 mb-2 gap-1 sm:gap-0">
                               <span className="font-medium">{product.category}</span>
-                              <span>•</span>
-                              <span className="text-lg font-bold text-gray-900">{formatPrice(product.price || 0, currency)}</span>
+                              <span className="hidden sm:inline">•</span>
+                              <span className="text-base lg:text-lg font-bold text-gray-900">{formatPrice(product.price || 0, currency)}</span>
                             </div>
                             {product.description && (
                               <p className="text-sm text-gray-600 line-clamp-2">{product.description}</p>
                             )}
                           </div>
-                          <div className="flex items-center space-x-2 ml-4">
+                          {/* Desktop buttons */}
+                          <div className="hidden lg:flex items-center space-x-2 ml-4">
                             <button
                               onClick={() => handleToggleActive(product)}
                               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -415,6 +423,68 @@ function ProductsManagementContent() {
                             >
                               Delete
                             </button>
+                          </div>
+                          {/* Mobile options button */}
+                          <div className="lg:hidden relative">
+                            <button
+                              onClick={() => setShowOptions(showOptions === product.id ? null : product.id)}
+                              className="p-2 hover:bg-gray-100 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                              aria-label="Options"
+                            >
+                              <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                              </svg>
+                            </button>
+                            {showOptions === product.id && (
+                              <>
+                                <div 
+                                  className="fixed inset-0 z-40" 
+                                  onClick={() => setShowOptions(null)}
+                                />
+                                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1">
+                                  <button
+                                    onClick={() => {
+                                      handleToggleActive(product);
+                                      setShowOptions(null);
+                                    }}
+                                    className={`w-full px-4 py-3 text-left text-sm transition-colors flex items-center ${
+                                      product.active === false
+                                        ? 'text-green-700 hover:bg-green-50'
+                                        : 'text-gray-700 hover:bg-gray-50'
+                                    }`}
+                                  >
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={product.active === false ? "M5 13l4 4L19 7" : "M6 18L18 6M6 6l12 12"} />
+                                    </svg>
+                                    {product.active === false ? 'Activate' : 'Deactivate'}
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      handleEditClick(product);
+                                      setShowOptions(null);
+                                    }}
+                                    className="w-full px-4 py-3 text-left text-sm text-blue-700 hover:bg-blue-50 transition-colors flex items-center"
+                                  >
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      handleDeleteClick(product);
+                                      setShowOptions(null);
+                                    }}
+                                    className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center"
+                                  >
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                    Delete
+                                  </button>
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>

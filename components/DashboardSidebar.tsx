@@ -240,8 +240,10 @@ export default function DashboardSidebar() {
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
         lg:translate-x-0
         w-64
+        flex flex-col
+        overflow-hidden
       `}>
-        <div className="p-4 lg:p-6">
+        <div className="p-4 lg:p-6 flex-shrink-0">
           <Link href="/dashboard" className="block" onClick={() => setIsMobileMenuOpen(false)}>
             <div className="flex flex-col items-center space-y-2 lg:space-y-3" style={{ minHeight: '120px' }}>
               {logoURL ? (
@@ -268,7 +270,7 @@ export default function DashboardSidebar() {
           </Link>
         </div>
 
-        <nav className="px-2 lg:px-4 space-y-1 overflow-y-auto max-h-[calc(100vh-200px)]">
+        <nav className="px-2 lg:px-4 space-y-1 overflow-y-auto flex-1 min-h-0 pb-2">
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -276,7 +278,7 @@ export default function DashboardSidebar() {
                 key={item.href}
                 href={item.href}
                 onClick={() => setIsMobileMenuOpen(false)}
-                className={`flex items-center px-3 lg:px-4 py-2 lg:py-1 rounded-lg transition-colors text-sm lg:text-base ${
+                className={`flex items-center px-3 lg:px-4 py-2 lg:py-1 rounded-lg transition-colors text-sm lg:text-base min-h-[44px] ${
                   isActive
                     ? 'font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
@@ -293,10 +295,10 @@ export default function DashboardSidebar() {
           })}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-3 lg:p-4 space-y-2 border-t border-gray-200 bg-white">
+        <div className="flex-shrink-0 p-3 lg:p-4 space-y-2 border-t border-gray-200 bg-white">
           <button 
             onClick={handleLogout}
-            className="flex items-center px-3 lg:px-4 py-2 lg:py-3 text-red-600 hover:bg-red-50 rounded-lg w-full transition-colors text-sm lg:text-base"
+            className="flex items-center px-3 lg:px-4 py-2 lg:py-3 text-red-600 hover:bg-red-50 rounded-lg w-full transition-colors text-sm lg:text-base min-h-[44px]"
           >
             <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

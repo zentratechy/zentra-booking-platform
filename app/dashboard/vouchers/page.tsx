@@ -282,24 +282,24 @@ function VouchersContent() {
       
       <div className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
         {/* Header */}
-        <div className="bg-white shadow-sm sticky top-0 z-30">
-          <div className="px-8 py-6">
-            <div className="flex justify-between items-center">
+        <div className="bg-white shadow-sm sticky top-16 lg:top-0 z-30">
+          <div className="px-4 sm:px-6 lg:px-8 py-4 lg:py-6">
+            <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Gift Vouchers</h1>
-                <p className="text-gray-600">Create and manage gift vouchers for your business</p>
+                <h1 className="text-xl lg:text-3xl font-bold text-gray-900 mb-2">Gift Vouchers</h1>
+                <p className="text-sm lg:text-base text-gray-600">Create and manage gift vouchers for your business</p>
               </div>
-              <div className="flex items-center space-x-4">
+              <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4">
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-gray-600">Voucher System:</span>
                   <button
                     onClick={handleToggleVoucherSystem}
                     disabled={!voucherSystemActive && !hasPaymentProvider()}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    className={`toggle-switch relative inline-flex min-h-[25px] w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
                       voucherSystemActive ? 'bg-primary' : 'bg-gray-300'
                     } ${!voucherSystemActive && !hasPaymentProvider() ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm border border-gray-200 transition-transform duration-200 ease-in-out ${
                       voucherSystemActive ? 'translate-x-6' : 'translate-x-1'
                     }`} />
                   </button>
@@ -310,7 +310,7 @@ function VouchersContent() {
                 <button
                   onClick={() => setShowCreateModal(true)}
                   disabled={!voucherSystemActive}
-                  className="bg-primary hover:bg-primary-dark text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-primary hover:bg-primary-dark text-white px-6 py-2.5 rounded-lg font-semibold transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] w-full lg:w-auto"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -320,8 +320,8 @@ function VouchersContent() {
               </div>
             </div>
             {!voucherSystemActive && !hasPaymentProvider() && (
-              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-sm text-yellow-800">
+              <div className="mt-4 p-3 lg:p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-xs lg:text-sm text-yellow-800">
                   ⚠️ Connect a payment provider (Stripe or Square) in Settings to enable the voucher system
                 </p>
               </div>
@@ -332,55 +332,55 @@ function VouchersContent() {
         {/* Content */}
         <div className="p-4 sm:p-6 lg:p-8">
           {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
+            <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-gray-600">Total Sold</p>
-                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <p className="text-xs lg:text-sm text-gray-600">Total Sold</p>
+                <div className="w-8 h-8 lg:w-10 lg:h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-4 h-4 lg:w-6 lg:h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
               </div>
-              <p className="text-2xl font-bold text-gray-900">{formatPrice(totalValue, currency)}</p>
+              <p className="text-xl lg:text-2xl font-bold text-gray-900">{formatPrice(totalValue, currency)}</p>
               <p className="text-xs text-gray-500 mt-1">{vouchers.length} vouchers</p>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-gray-600">Active Balance</p>
-                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <p className="text-xs lg:text-sm text-gray-600">Active Balance</p>
+                <div className="w-8 h-8 lg:w-10 lg:h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-4 h-4 lg:w-6 lg:h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
               </div>
-              <p className="text-2xl font-bold text-green-600">{formatPrice(activeBalance, currency)}</p>
+              <p className="text-xl lg:text-2xl font-bold text-green-600">{formatPrice(activeBalance, currency)}</p>
               <p className="text-xs text-gray-500 mt-1">{activeCount} active</p>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-gray-600">Redeemed</p>
-                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <p className="text-xs lg:text-sm text-gray-600">Redeemed</p>
+                <div className="w-8 h-8 lg:w-10 lg:h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-4 h-4 lg:w-6 lg:h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
               </div>
-              <p className="text-2xl font-bold text-blue-600">{formatPrice(redeemedAmount, currency)}</p>
+              <p className="text-xl lg:text-2xl font-bold text-blue-600">{formatPrice(redeemedAmount, currency)}</p>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-gray-600">Outstanding</p>
-                <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <p className="text-xs lg:text-sm text-gray-600">Outstanding</p>
+                <div className="w-8 h-8 lg:w-10 lg:h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-4 h-4 lg:w-6 lg:h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
               </div>
-              <p className="text-2xl font-bold text-yellow-600">{formatPrice(activeBalance, currency)}</p>
+              <p className="text-xl lg:text-2xl font-bold text-yellow-600">{formatPrice(activeBalance, currency)}</p>
               <p className="text-xs text-gray-500 mt-1">Yet to be used</p>
             </div>
           </div>
