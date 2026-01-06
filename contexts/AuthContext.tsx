@@ -34,6 +34,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const { doc, getDoc } = await import('firebase/firestore');
           const { db } = await import('@/lib/firebase');
           
+          if (!db) {
+            console.warn('Firestore is not initialized');
+            setLoading(false);
+            return;
+          }
+          
           // Check if user is a business owner
           const businessDoc = await getDoc(doc(db, 'businesses', user.uid));
           if (businessDoc.exists()) {
@@ -64,7 +70,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, []);
 
   return (

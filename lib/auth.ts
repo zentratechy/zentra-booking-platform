@@ -140,6 +140,11 @@ export async function getBusinessData(userId: string) {
 
 // Auth state listener
 export function onAuthStateChange(callback: (user: User | null) => void) {
+  if (!auth) {
+    console.error('Firebase Auth is not initialized');
+    // Return a no-op unsubscribe function
+    return () => {};
+  }
   return onAuthStateChanged(auth, callback);
 }
 
